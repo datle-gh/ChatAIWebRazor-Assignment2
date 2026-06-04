@@ -1,6 +1,6 @@
 # ChatAIWeb
 
-ChatAIWeb is an ASP.NET Core MVC application that provides a RAG chatbot for Vietnamese study materials. The system lets Admins/Teachers upload PDF, DOCX, and PPTX files, split the content into chunks, generate embeddings, retrieve relevant context, and produce answers with source citations.
+ChatAIWeb is an ASP.NET Core Razor Pages application that provides a RAG chatbot for Vietnamese study materials. The system lets Admins/Teachers upload PDF, DOCX, and PPTX files, split the content into chunks, generate embeddings, retrieve relevant context, and produce answers with source citations.
 
 The project follows a 3-layer architecture for the PRN222/FPT course: `Presentation`, `BusinessLogic`, `DataAccess`, `BusinessObject`.
 
@@ -40,8 +40,8 @@ The project follows a 3-layer architecture for the PRN222/FPT course: `Presentat
 
 | Component | Technology |
 | --- | --- |
-| Backend web | ASP.NET Core MVC, .NET 8 |
-| UI | Razor Views, Bootstrap, jQuery, SignalR |
+| Backend web | ASP.NET Core Razor Pages, .NET 8 |
+| UI | Razor Pages, Bootstrap, jQuery, SignalR |
 | Database | SQL Server, Entity Framework Core |
 | Auth | Cookie Authentication |
 | LLM | Google Gemini, Fake LLM fallback |
@@ -344,9 +344,8 @@ ChatAIWeb
 │   ├── Infrastructure
 │   └── Services
 ├── Presentation
-│   ├── Controllers
+│   ├── Pages
 │   ├── Models
-│   ├── Views
 │   ├── wwwroot
 │   └── Program.cs
 └── python_services
@@ -358,16 +357,15 @@ ChatAIWeb
 
 ### Presentation
 
-Contains the ASP.NET Core MVC UI:
+Contains the ASP.NET Core Razor Pages UI:
 
-- Controllers.
-- Razor views.
+- Razor Pages (`.cshtml` + PageModels).
 - ViewModels.
 - Cookie authentication.
 - Dependency injection in `Program.cs`.
 - SignalR upload progress hub.
 
-Controllers should be thin and only call services in `BusinessLogic`.
+PageModels should be thin and only call services in `BusinessLogic`.
 
 ### BusinessLogic
 

@@ -22,7 +22,13 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AddPageRoute("/Dashboard/Index", "");
+    options.Conventions.AddPageRoute("/Dashboard/Index", "Dashboard");
+    options.Conventions.AddPageRoute("/Chat/Index", "Chat");
+    options.Conventions.AddPageRoute("/Document/Index", "Document");
+});
 builder.Services.AddSignalR();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -116,9 +122,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Dashboard}/{action=Index}");
+app.MapRazorPages();
 app.MapHub<UploadProgressHub>("/hubs/upload-progress");
 
 app.Run();

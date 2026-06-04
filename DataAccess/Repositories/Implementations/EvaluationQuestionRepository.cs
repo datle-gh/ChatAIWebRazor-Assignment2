@@ -62,4 +62,11 @@ public sealed class EvaluationQuestionRepository : IEvaluationQuestionRepository
         return await _context.EvaluationQuestions
             .CountAsync(eq => eq.SubjectId == subjectId, cancellationToken);
     }
+
+    public Task<int> GetTotalAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.EvaluationQuestions
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+    }
 }

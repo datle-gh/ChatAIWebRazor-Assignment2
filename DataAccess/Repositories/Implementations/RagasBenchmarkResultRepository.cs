@@ -56,6 +56,13 @@ public sealed class RagasBenchmarkResultRepository : IRagasBenchmarkResultReposi
             .CountAsync(r => r.EvaluationQuestion.SubjectId == subjectId, cancellationToken);
     }
 
+    public Task<int> GetTotalAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.RagasBenchmarkResults
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+    }
+
     public async Task<RagasBenchmarkResult?> GetLatestBySubjectAsync(int subjectId, CancellationToken cancellationToken = default)
     {
         return await _context.RagasBenchmarkResults
@@ -138,6 +145,19 @@ public sealed class RagasBenchmarkResultRepository : IRagasBenchmarkResultReposi
                 && r.RunId == latest.RunId)
             .OrderBy(r => r.EmbeddingModel)
             .ThenBy(r => r.EvaluationQuestionId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<RagasBenchmarkResult>> GetRecentAsync(
+        int count,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.RagasBenchmarkResults
+            .AsNoTracking()
+            .Include(result => result.EvaluationQuestion)
+                .ThenInclude(question => question.Subject)
+            .OrderByDescending(result => result.CreatedAt)
+            .Take(count)
             .ToListAsync(cancellationToken);
     }
 

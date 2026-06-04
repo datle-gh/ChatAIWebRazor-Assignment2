@@ -9,6 +9,8 @@ public interface IRagasBenchmarkResultRepository
         CancellationToken cancellationToken = default);
     Task AddRangeAsync(IEnumerable<RagasBenchmarkResult> results, CancellationToken cancellationToken = default);
     Task<int> CountBySubjectAsync(int subjectId, CancellationToken cancellationToken = default);
+    Task<int> GetTotalAsync(CancellationToken cancellationToken = default);
     Task<RagasBenchmarkResult?> GetLatestBySubjectAsync(int subjectId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RagasBenchmarkResult>> GetLatestRunBySubjectAsync(int subjectId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<RagasBenchmarkResult>> GetRecentAsync(int count, CancellationToken cancellationToken = default);
 }

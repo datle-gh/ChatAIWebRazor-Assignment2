@@ -22,4 +22,8 @@ public interface IChatRepository
     Task<IReadOnlyList<ChatMessage>> GetMessagesBySessionIdAsync(
         int sessionId,
         CancellationToken cancellationToken = default);
+
+    Task<int> CountSessionsAsync(CancellationToken cancellationToken = default);
+
+    Task<int> CountMessagesAsync(CancellationToken cancellationToken = default);
 }

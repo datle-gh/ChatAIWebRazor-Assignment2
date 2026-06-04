@@ -2,7 +2,7 @@
 
 ## 1. Project Overview
 
-This repository is an ASP.NET Core MVC project named **ChatAIWeb**.
+This repository is an ASP.NET Core Razor Pages project named **ChatAIWeb**.
 
 The system is a Vietnamese RAG-based chatbot that allows students to ask questions based on uploaded course documents.
 
@@ -44,9 +44,8 @@ ChatAIWeb
 │   └── Repositories
 │
 └── Presentation
-    ├── Controllers
+    ├── Pages
     ├── Models
-    ├── Views
     ├── wwwroot
     ├── appsettings.json
     └── Program.cs
@@ -55,7 +54,7 @@ ChatAIWeb
 Layer meaning:
 
 ```text
-Presentation   = ASP.NET Core MVC UI layer
+Presentation   = ASP.NET Core Razor Pages UI layer
 BusinessLogic  = business rules, orchestration, RAG pipeline
 DataAccess     = EF Core, database access, repositories
 BusinessObject = shared entities, enums, and common domain models
@@ -73,47 +72,49 @@ Project: `Presentation`
 
 Allowed responsibilities:
 
-- MVC Controllers
-- Razor Views
-- ViewModels and input models
+- Razor Pages (`.cshtml` + `.cshtml.cs` PageModels)
+- Razor view markup
+- ViewModels and input models (bound via `[BindProperty]`)
 - UI validation
-- Routing
+- Routing (page-based routing, `@page` directives)
 - Dependency injection setup in `Program.cs`
 - Reading configuration from `appsettings.json`
 
 Not allowed:
 
-- Do not query EF Core directly in controllers.
+- Do not query EF Core directly in PageModels.
 - Do not access the database directly.
 - Do not implement document chunking logic.
 - Do not implement embedding logic.
 - Do not implement LLM API logic.
-- Do not put business rules inside controllers.
+- Do not put business rules inside PageModels.
 
-Controllers must be thin and only call services from `BusinessLogic`.
+PageModels must be thin and only call services from `BusinessLogic`.
 
 Correct pattern:
 
 ```csharp
-public class ChatController : Controller
+public class AskModel : PageModel
 {
     private readonly IChatbotService _chatbotService;
 
-    public ChatController(IChatbotService chatbotService)
+    public AskModel(IChatbotService chatbotService)
     {
         _chatbotService = chatbotService;
     }
 
-    [HttpPost]
-    public async Task<IActionResult> Ask(ChatRequestViewModel model)
+    [BindProperty]
+    public ChatRequestViewModel Input { get; set; } = new();
+
+    public async Task<IActionResult> OnPostAsync()
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return Page();
         }
 
-        var result = await _chatbotService.AskAsync(model);
-        return Json(result);
+        var result = await _chatbotService.AskAsync(Input);
+        return new JsonResult(result);
     }
 }
 ```
@@ -147,8 +148,7 @@ This layer may call:
 
 This layer must not contain:
 
-- MVC View code
-- Razor code
+- Razor Pages or view code
 - Direct UI concerns
 - Direct EF Core queries when a repository already exists
 
@@ -202,7 +202,7 @@ Allowed responsibilities:
 
 Not allowed:
 
-- Do not write MVC code.
+- Do not write Razor Pages or UI code.
 - Do not write LLM code.
 - Do not write document chunking logic.
 - Do not write business decision logic.
@@ -260,7 +260,7 @@ Not allowed:
 
 - Do not write EF query logic.
 - Do not write service logic.
-- Do not write controller logic.
+- Do not write PageModel or UI logic.
 - Do not write external API logic.
 
 Recommended structure:
@@ -381,7 +381,7 @@ User question
 When implementing chatbot logic, follow this workflow:
 
 ```text
-ChatController
+Chat PageModel
 → IChatbotService
 → IEmbeddingService
 → IVectorSearchService
@@ -468,7 +468,7 @@ General rules:
 - Use C# async/await.
 - Use dependency injection.
 - Use interfaces for services and repositories.
-- Keep controllers thin.
+- Keep PageModels thin.
 - Keep services focused.
 - Avoid duplicate logic.
 - Use meaningful names.
@@ -608,9 +608,9 @@ When adding or changing functionality:
 - Fix compile errors.
 - Check dependency direction.
 - Check async usage.
-- Check that controllers do not contain business logic.
+- Check that PageModels do not contain business logic.
 - Check that repositories do not contain business rules.
-- Check that services do not directly return MVC Views.
+- Check that services do not directly return Razor Pages or views.
 
 Preferred commands:
 
@@ -634,7 +634,7 @@ When asked to implement the project, follow this priority:
 1. Database connection and entities.
 2. Repository layer.
 3. Service layer.
-4. MVC controllers and views.
+4. Razor Pages and PageModels.
 5. Upload document feature.
 6. PDF text extraction.
 7. Chunking and saving chunks.
@@ -658,21 +658,17 @@ Upload one PDF
 
 ---
 
-## 14. ASP.NET Core MVC Rules
+## 14. ASP.NET Core Razor Pages Rules
 
-Use ASP.NET Core MVC conventions.
+Use ASP.NET Core Razor Pages conventions.
 
-Controllers should be in:
-
-```text
-Presentation/Controllers
-```
-
-Views should be in:
+Pages should be in:
 
 ```text
-Presentation/Views
+Presentation/Pages
 ```
+
+Each page is a `.cshtml` file with a matching `.cshtml.cs` PageModel.
 
 Static assets should be in:
 
@@ -680,7 +676,7 @@ Static assets should be in:
 Presentation/wwwroot
 ```
 
-Use ViewModels for form input and UI rendering.
+Use ViewModels for form input and UI rendering. Bind input with `[BindProperty]` and handle requests via `OnGet`/`OnPost` handlers.
 
 Do not pass EF entities directly to complex forms when a ViewModel is more appropriate.
 
@@ -734,7 +730,7 @@ Always preserve the 3-layer architecture.
 The most important rule:
 
 ```text
-Controller does not contain business logic.
+PageModel does not contain business logic.
 BusinessLogic does not contain UI logic.
 DataAccess does not contain business workflow.
 BusinessObject does not depend on other layers.

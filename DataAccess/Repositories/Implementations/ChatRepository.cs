@@ -86,4 +86,18 @@ public sealed class ChatRepository : IChatRepository
             .ThenBy(message => message.Id)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<int> CountSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.ChatSessions
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+    }
+
+    public Task<int> CountMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        return _context.ChatMessages
+            .AsNoTracking()
+            .CountAsync(cancellationToken);
+    }
 }

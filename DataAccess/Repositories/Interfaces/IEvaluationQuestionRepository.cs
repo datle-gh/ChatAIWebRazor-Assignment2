@@ -11,4 +11,5 @@ public interface IEvaluationQuestionRepository
     Task UpdateAsync(EvaluationQuestion entity, CancellationToken cancellationToken = default);
     Task DeleteAsync(EvaluationQuestion entity, CancellationToken cancellationToken = default);
     Task<int> CountBySubjectAsync(int subjectId, CancellationToken cancellationToken = default);
+    Task<int> GetTotalAsync(CancellationToken cancellationToken = default);
 }

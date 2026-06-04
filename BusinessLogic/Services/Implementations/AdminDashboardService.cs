@@ -1,9 +1,7 @@
 using BusinessLogic.Services.Interfaces;
 using BusinessLogic.DTOs.Responses;
 using BusinessObject.Enums;
-using DataAccess;
 using DataAccess.Repositories.Interfaces;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace BusinessLogic.Services.Implementations;
@@ -13,20 +11,26 @@ public sealed class AdminDashboardService : IAdminDashboardService
     private readonly IUserRepository _userRepository;
     private readonly ISubjectRepository _subjectRepository;
     private readonly IDocumentRepository _documentRepository;
-    private readonly ChatAIWebDbContext _context;
+    private readonly IChatRepository _chatRepository;
+    private readonly IEvaluationQuestionRepository _evaluationQuestionRepository;
+    private readonly IRagasBenchmarkResultRepository _ragasBenchmarkResultRepository;
     private readonly ILogger<AdminDashboardService> _logger;
 
     public AdminDashboardService(
         IUserRepository userRepository,
         ISubjectRepository subjectRepository,
         IDocumentRepository documentRepository,
-        ChatAIWebDbContext context,
+        IChatRepository chatRepository,
+        IEvaluationQuestionRepository evaluationQuestionRepository,
+        IRagasBenchmarkResultRepository ragasBenchmarkResultRepository,
         ILogger<AdminDashboardService> logger)
     {
         _userRepository = userRepository;
         _subjectRepository = subjectRepository;
         _documentRepository = documentRepository;
-        _context = context;
+        _chatRepository = chatRepository;
+        _evaluationQuestionRepository = evaluationQuestionRepository;
+        _ragasBenchmarkResultRepository = ragasBenchmarkResultRepository;
         _logger = logger;
     }
 
@@ -69,28 +73,12 @@ public sealed class AdminDashboardService : IAdminDashboardService
                     doc.UploadedAt))
                 .ToList();
 
-            var chatSessionCount = await _context.ChatSessions
-                .AsNoTracking()
-                .CountAsync(cancellationToken);
+            var chatSessionCount = await _chatRepository.CountSessionsAsync(cancellationToken);
+            var chatMessageCount = await _chatRepository.CountMessagesAsync(cancellationToken);
+            var evaluationQuestionCount = await _evaluationQuestionRepository.GetTotalAsync(cancellationToken);
+            var benchmarkCount = await _ragasBenchmarkResultRepository.GetTotalAsync(cancellationToken);
 
-            var chatMessageCount = await _context.ChatMessages
-                .AsNoTracking()
-                .CountAsync(cancellationToken);
-
-            var evaluationQuestionCount = await _context.EvaluationQuestions
-                .AsNoTracking()
-                .CountAsync(cancellationToken);
-
-            var benchmarkCount = await _context.RagasBenchmarkResults
-                .AsNoTracking()
-                .CountAsync(cancellationToken);
-
-            var recentBenchmarks = await _context.RagasBenchmarkResults
-                .AsNoTracking()
-                .Include(result => result.EvaluationQuestion)
-                    .ThenInclude(question => question.Subject)
-                .OrderByDescending(result => result.CreatedAt)
-                .Take(5)
+            var recentBenchmarks = (await _ragasBenchmarkResultRepository.GetRecentAsync(5, cancellationToken))
                 .Select(result => new RecentBenchmarkDto(
                     result.Id,
                     result.EvaluationQuestion.Subject.SubjectName,
@@ -98,7 +86,7 @@ public sealed class AdminDashboardService : IAdminDashboardService
                     result.LlmModel,
                     result.OverallScore,
                     result.CreatedAt))
-                .ToListAsync(cancellationToken);
+                .ToList();
 
             return new AdminDashboardDto(
                 StudentCount: studentCount,

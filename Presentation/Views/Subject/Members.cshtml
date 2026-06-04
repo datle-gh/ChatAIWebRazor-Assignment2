@@ -1,0 +1,777 @@
+@model SubjectMembersViewModel
+
+@{
+    ViewData["Title"] = "Thành viên môn học";
+    Layout = "_Layout";
+
+    var teachers = Model.Members
+        .Where(m => m.RoleInClass == "Teacher")
+        .OrderByDescending(m => m.IsHeadTeacher)
+        .ThenBy(m => m.FullName)
+        .ToList();
+
+    var students = Model.Members
+        .Where(m => m.RoleInClass != "Teacher")
+        .OrderBy(m => m.FullName)
+        .ToList();
+}
+
+<style>
+    /* ── Members page ── */
+    .members-page {
+        padding: 28px 32px 40px;
+        min-height: 100%;
+    }
+
+    .members-topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+        flex-wrap: wrap;
+    }
+
+    .members-back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--secondary);
+        text-decoration: none;
+        margin-bottom: 10px;
+        transition: color 150ms ease;
+    }
+
+    .members-back-link:hover { color: var(--primary-container); }
+
+    .members-back-link .material-symbols-outlined { font-size: 1.1rem; }
+
+    .members-subject-badges {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+    }
+
+    .badge-code {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        background: var(--surface-container);
+        color: var(--on-surface-variant);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .badge-head {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        background: #fff7ed;
+        color: #b45309;
+        border: 1px solid #fed7aa;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .members-title {
+        font-family: 'Be Vietnam Pro', sans-serif;
+        font-size: 2rem;
+        font-weight: 800;
+        color: var(--on-surface);
+        margin: 0 0 4px;
+        line-height: 1.2;
+    }
+
+    .members-subtitle {
+        font-size: 0.875rem;
+        color: var(--on-surface-variant);
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+    }
+
+    .members-edit-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 22px;
+        background: var(--primary-container);
+        color: #fff;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        text-decoration: none;
+        flex-shrink: 0;
+        transition: background 160ms ease, box-shadow 160ms ease;
+        box-shadow: 0 4px 14px rgba(79,70,229,0.25);
+    }
+
+    .members-edit-btn:hover {
+        background: #4338ca;
+        color: #fff;
+        box-shadow: 0 6px 18px rgba(79,70,229,0.35);
+    }
+
+    /* ── Alert banners ── */
+    .alert-success-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        background: #e2dfff;
+        border: 1px solid #c3c0ff;
+        color: #3525cd;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-family: 'Inter', sans-serif;
+        margin-bottom: 20px;
+    }
+
+    .alert-error-banner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 18px;
+        background: #ffdad6;
+        border: 1px solid #ffb4ab;
+        color: #ba1a1a;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-family: 'Inter', sans-serif;
+        margin-bottom: 20px;
+    }
+
+    /* ── Main grid ── */
+    .members-grid {
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        gap: 24px;
+        align-items: start;
+    }
+
+    @@media (max-width: 1100px) {
+        .members-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ── Accordion group tables ── */
+    .members-accordion {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .accordion-card {
+        background: var(--surface-lowest);
+        border: 1px solid var(--outline-variant);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: var(--shadow-indigo);
+    }
+
+    .accordion-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 22px;
+        cursor: pointer;
+        user-select: none;
+        border: 0;
+        width: 100%;
+        background: transparent;
+        text-align: left;
+        transition: background 150ms ease;
+    }
+
+    .accordion-header:hover { background: rgba(0,0,0,0.02); }
+
+    .accordion-role-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        flex-shrink: 0;
+    }
+
+    .accordion-role-icon.teacher {
+        background: #fff7ed;
+        color: #b45309;
+    }
+
+    .accordion-role-icon.student {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .accordion-role-icon .material-symbols-outlined { font-size: 1.25rem; }
+
+    .accordion-header-info { flex: 1; min-width: 0; }
+
+    .accordion-role-label {
+        font-family: 'Be Vietnam Pro', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--on-surface);
+        margin: 0;
+    }
+
+    .accordion-count {
+        font-size: 0.78rem;
+        color: var(--on-surface-variant);
+        font-family: 'Inter', sans-serif;
+        margin: 0;
+    }
+
+    .accordion-chevron {
+        font-size: 1.3rem;
+        color: var(--on-surface-variant);
+        transition: transform 250ms cubic-bezier(0.4,0,0.2,1);
+        flex-shrink: 0;
+    }
+
+    .accordion-card.open .accordion-chevron {
+        transform: rotate(180deg);
+    }
+
+    .accordion-body {
+        display: grid;
+        grid-template-rows: 0fr;
+        transition: grid-template-rows 320ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .accordion-body-inner {
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .accordion-card.open .accordion-body {
+        grid-template-rows: 1fr;
+        border-top: 1px solid var(--outline-variant);
+    }
+
+    /* ── Member table ── */
+    .member-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: 'Inter', sans-serif;
+        font-size: 0.875rem;
+    }
+
+    .member-table thead tr {
+        background: var(--surface-container);
+    }
+
+    .member-table th {
+        padding: 11px 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--on-surface-variant);
+        white-space: nowrap;
+        text-align: left;
+        border-bottom: 1px solid var(--outline-variant);
+    }
+
+    .member-table th:last-child { text-align: right; }
+
+    .member-table td {
+        padding: 14px 20px;
+        vertical-align: middle;
+        white-space: nowrap;
+        border-bottom: 1px solid rgba(199,196,216,0.3);
+        color: var(--on-surface);
+    }
+
+    .member-table tbody tr:last-child td { border-bottom: 0; }
+
+    .member-table tbody tr:hover { background: rgba(247,249,251,0.7); }
+
+    /* Head teacher row highlight */
+    .member-table tbody tr.is-head-teacher {
+        background: linear-gradient(90deg, rgba(251,191,36,0.06) 0%, transparent 100%);
+    }
+
+    .member-table tbody tr.is-head-teacher:hover {
+        background: linear-gradient(90deg, rgba(251,191,36,0.1) 0%, transparent 100%);
+    }
+
+    .member-name-cell { min-width: 160px; }
+
+    .member-name {
+        font-weight: 600;
+        color: var(--on-surface);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .crown-icon {
+        font-size: 1rem;
+        color: #d97706;
+    }
+
+    .head-teacher-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #92400e;
+        background: #fef3c7;
+        border: 1px solid #fde68a;
+        padding: 2px 8px;
+        border-radius: 20px;
+        margin-top: 3px;
+        white-space: nowrap;
+    }
+
+    .member-email {
+        color: var(--on-surface-variant);
+        font-size: 0.84rem;
+        max-width: 220px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .member-date {
+        color: var(--on-surface-variant);
+        font-size: 0.84rem;
+    }
+
+    .member-actions { text-align: right; }
+
+    .remove-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 13px;
+        background: rgba(186,26,26,0.07);
+        color: #ba1a1a;
+        border: 1px solid rgba(186,26,26,0.2);
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        cursor: pointer;
+        transition: background 150ms ease, box-shadow 150ms ease;
+    }
+
+    .remove-btn:hover {
+        background: rgba(186,26,26,0.12);
+        box-shadow: 0 2px 8px rgba(186,26,26,0.12);
+    }
+
+    .cannot-remove-text {
+        font-size: 0.78rem;
+        color: var(--on-surface-variant);
+        font-style: italic;
+    }
+
+    .empty-table-row td {
+        text-align: center;
+        padding: 32px;
+        color: var(--on-surface-variant);
+        font-style: italic;
+    }
+
+    /* ── Sidebar cards ── */
+    .sidebar-card {
+        background: var(--surface-lowest);
+        border: 1px solid var(--outline-variant);
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: var(--shadow-indigo);
+    }
+
+    .sidebar-card + .sidebar-card { margin-top: 20px; }
+
+    .sidebar-card-title {
+        font-family: 'Be Vietnam Pro', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--on-surface);
+        margin: 0 0 16px;
+    }
+
+    .sidebar-label {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--on-surface);
+        font-family: 'Inter', sans-serif;
+        margin-bottom: 6px;
+    }
+
+    .sidebar-select {
+        width: 100%;
+        padding: 9px 14px;
+        border: 1.5px solid var(--outline-variant);
+        border-radius: 10px;
+        background: var(--surface-lowest);
+        color: var(--on-surface);
+        font-size: 0.875rem;
+        font-family: 'Inter', sans-serif;
+        outline: none;
+        transition: border-color 160ms ease;
+        margin-bottom: 14px;
+        appearance: auto;
+    }
+
+    .sidebar-select:focus { border-color: var(--primary-container); }
+
+    .sidebar-add-btn {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--primary-container);
+        color: #fff;
+        border: 0;
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        cursor: pointer;
+        transition: background 150ms ease, box-shadow 150ms ease;
+        box-shadow: 0 3px 10px rgba(79,70,229,0.2);
+    }
+
+    .sidebar-add-btn:hover {
+        background: #4338ca;
+        box-shadow: 0 5px 14px rgba(79,70,229,0.3);
+    }
+
+    .sidebar-import-btn {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--surface-container);
+        color: var(--on-surface);
+        border: 1.5px solid var(--outline-variant);
+        border-radius: 10px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+        cursor: pointer;
+        transition: background 150ms ease;
+    }
+
+    .sidebar-import-btn:hover { background: var(--surface-low); }
+
+    .sidebar-file-input {
+        width: 100%;
+        font-size: 0.84rem;
+        font-family: 'Inter', sans-serif;
+        margin-bottom: 14px;
+    }
+
+    .sidebar-hint {
+        font-size: 0.8rem;
+        color: var(--on-surface-variant);
+        font-family: 'Inter', sans-serif;
+        margin: 0 0 14px;
+        line-height: 1.5;
+    }
+</style>
+
+<div class="members-page">
+
+    @* ── Top bar ── *@
+    <div class="members-topbar">
+        <div>
+            <a asp-controller="Subject" asp-action="Index" class="members-back-link">
+                <span class="material-symbols-outlined">arrow_back</span>
+                Quay lại quản lý môn học
+            </a>
+            <div class="members-subject-badges">
+                <span class="badge-code">@Model.SubjectCode</span>
+                @if (!string.IsNullOrWhiteSpace(Model.HeadTeacherName))
+                {
+                    <span class="badge-head">
+                        <span class="material-symbols-outlined icon-fill" style="font-size:0.9rem">workspace_premium</span>
+                        Trưởng bộ môn: @Model.HeadTeacherName
+                    </span>
+                }
+            </div>
+            <h1 class="members-title">@Model.SubjectName</h1>
+            <p class="members-subtitle">Quản lý giảng viên, sinh viên và danh sách tham gia trong môn học.</p>
+        </div>
+        <a asp-controller="Subject" asp-action="Edit" asp-route-id="@Model.SubjectId" class="members-edit-btn">
+            <span class="material-symbols-outlined" style="font-size:1.1rem">edit</span>
+            Sửa môn học
+        </a>
+    </div>
+
+    @* ── Alert banners ── *@
+    @if (TempData["SuccessMessage"] is string successMsg)
+    {
+        <div class="alert-success-banner">
+            <span class="material-symbols-outlined" style="font-size:1.1rem">check_circle</span>
+            @successMsg
+        </div>
+    }
+    @if (TempData["ErrorMessage"] is string errorMsg)
+    {
+        <div class="alert-error-banner">
+            <span class="material-symbols-outlined" style="font-size:1.1rem">error</span>
+            @errorMsg
+        </div>
+    }
+
+    @* ── Main grid ── *@
+    <div class="members-grid">
+
+        @* ── Left: accordion tables ── *@
+        <div class="members-accordion">
+
+            @* ── Teachers table ── *@
+            <div class="accordion-card" id="accordion-teachers">
+                <button class="accordion-header" type="button" onclick="toggleAccordion('accordion-teachers')" aria-expanded="false">
+                    <span class="accordion-role-icon teacher">
+                        <span class="material-symbols-outlined icon-fill">school</span>
+                    </span>
+                    <div class="accordion-header-info">
+                        <p class="accordion-role-label">Giảng viên</p>
+                        <p class="accordion-count">@teachers.Count người</p>
+                    </div>
+                    <span class="material-symbols-outlined accordion-chevron">expand_more</span>
+                </button>
+                <div class="accordion-body">
+                    <div class="accordion-body-inner">
+                        <div style="overflow-x:auto">
+                        <table class="member-table">
+                            <thead>
+                                <tr>
+                                    <th>Họ tên</th>
+                                    <th>Email</th>
+                                    <th>Ngày tham gia</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!teachers.Any())
+                                {
+                                    <tr class="empty-table-row">
+                                        <td colspan="4">Chưa có giảng viên nào.</td>
+                                    </tr>
+                                }
+                                @foreach (var member in teachers)
+                                {
+                                    <tr class="@(member.IsHeadTeacher ? "is-head-teacher" : "")">
+                                        <td class="member-name-cell">
+                                            <div class="member-name">
+                                                @if (member.IsHeadTeacher)
+                                                {
+                                                    <span class="material-symbols-outlined icon-fill crown-icon" title="Trưởng bộ môn">workspace_premium</span>
+                                                }
+                                                @member.FullName
+                                            </div>
+                                            @if (member.IsHeadTeacher)
+                                            {
+                                                <div class="head-teacher-badge">
+                                                    <span class="material-symbols-outlined" style="font-size:0.75rem">star</span>
+                                                    Trưởng bộ môn
+                                                </div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="member-email" title="@member.Email">@member.Email</span>
+                                        </td>
+                                        <td class="member-date">
+                                            @member.EnrolledAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                        </td>
+                                        <td class="member-actions">
+                                            @if (member.EnrollmentId.HasValue && !member.IsHeadTeacher)
+                                            {
+                                                <form asp-controller="Subject" asp-action="RemoveMember" method="post" style="display:inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="subjectId" value="@Model.SubjectId" />
+                                                    <input type="hidden" name="enrollmentId" value="@member.EnrollmentId.Value" />
+                                                    <button type="submit" class="remove-btn"
+                                                            onclick="return confirm('Xóa thành viên này khỏi môn học?')">
+                                                        <span class="material-symbols-outlined" style="font-size:0.9rem">person_remove</span>
+                                                        Xóa
+                                                    </button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <span class="cannot-remove-text">Không thể xóa</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Students table ── *@
+            <div class="accordion-card" id="accordion-students">
+                <button class="accordion-header" type="button" onclick="toggleAccordion('accordion-students')" aria-expanded="false">
+                    <span class="accordion-role-icon student">
+                        <span class="material-symbols-outlined icon-fill">person</span>
+                    </span>
+                    <div class="accordion-header-info">
+                        <p class="accordion-role-label">Sinh viên</p>
+                        <p class="accordion-count">@students.Count người</p>
+                    </div>
+                    <span class="material-symbols-outlined accordion-chevron">expand_more</span>
+                </button>
+                <div class="accordion-body">
+                    <div class="accordion-body-inner">
+                        <div style="overflow-x:auto">
+                        <table class="member-table">
+                            <thead>
+                                <tr>
+                                    <th>Họ tên</th>
+                                    <th>Email</th>
+                                    <th>Ngày tham gia</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!students.Any())
+                                {
+                                    <tr class="empty-table-row">
+                                        <td colspan="4">Chưa có sinh viên nào.</td>
+                                    </tr>
+                                }
+                                @foreach (var member in students)
+                                {
+                                    <tr>
+                                        <td class="member-name-cell">
+                                            <div class="member-name">@member.FullName</div>
+                                        </td>
+                                        <td>
+                                            <span class="member-email" title="@member.Email">@member.Email</span>
+                                        </td>
+                                        <td class="member-date">
+                                            @member.EnrolledAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                                        </td>
+                                        <td class="member-actions">
+                                            @if (member.EnrollmentId.HasValue)
+                                            {
+                                                <form asp-controller="Subject" asp-action="RemoveMember" method="post" style="display:inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="subjectId" value="@Model.SubjectId" />
+                                                    <input type="hidden" name="enrollmentId" value="@member.EnrollmentId.Value" />
+                                                    <button type="submit" class="remove-btn"
+                                                            onclick="return confirm('Xóa thành viên này khỏi môn học?')">
+                                                        <span class="material-symbols-outlined" style="font-size:0.9rem">person_remove</span>
+                                                        Xóa
+                                                    </button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <span class="cannot-remove-text">Không thể xóa</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        @* ── Right sidebar ── *@
+        <aside>
+            @* Add member *@
+            <div class="sidebar-card">
+                <h2 class="sidebar-card-title">Thêm thành viên</h2>
+                <form asp-controller="Subject" asp-action="AddMember" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="subjectId" value="@Model.SubjectId" />
+
+                    <label class="sidebar-label" for="addMemberUserId">Người dùng</label>
+                    <select asp-for="AddMember.UserId" id="addMemberUserId" class="sidebar-select">
+                        <option value="">-- Chọn người dùng --</option>
+                        @foreach (var candidate in Model.Candidates)
+                        {
+                            <option value="@candidate.UserId">
+                                @candidate.FullName — @candidate.Email (@(candidate.Role == "Teacher" ? "Giảng viên" : "Sinh viên"))
+                            </option>
+                        }
+                    </select>
+
+                    <label class="sidebar-label" for="addMemberRole">Role trong môn</label>
+                    <select asp-for="AddMember.RoleInClass" id="addMemberRole" class="sidebar-select">
+                        <option value="Student">Sinh viên</option>
+                        <option value="Teacher">Giảng viên</option>
+                    </select>
+
+                    <button type="submit" class="sidebar-add-btn">
+                        <span class="material-symbols-outlined" style="font-size:1.1rem">person_add</span>
+                        Thêm vào môn học
+                    </button>
+                </form>
+            </div>
+
+            @* Import *@
+            <div class="sidebar-card" style="margin-top:20px">
+                <h2 class="sidebar-card-title">Import danh sách lớp</h2>
+                <p class="sidebar-hint">
+                    File CSV/XLS/XLSX gồm cột email và role.<br>
+                    Role nhận <strong>Teacher</strong> hoặc <strong>Student</strong>.
+                </p>
+                <form asp-controller="Subject" asp-action="ImportMembers" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="subjectId" value="@Model.SubjectId" />
+                    <input type="file"
+                           name="file"
+                           accept=".csv,.xls,.xlsx,.xlsm"
+                           class="sidebar-file-input" />
+                    <button type="submit" class="sidebar-import-btn">
+                        <span class="material-symbols-outlined" style="font-size:1.1rem">upload_file</span>
+                        Import danh sách
+                    </button>
+                </form>
+            </div>
+        </aside>
+
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleAccordion(id) {
+            const card = document.getElementById(id);
+            const isOpen = card.classList.contains('open');
+            card.classList.toggle('open', !isOpen);
+            card.querySelector('.accordion-header').setAttribute('aria-expanded', String(!isOpen));
+        }
+
+        // Open all accordions on load (no animation needed since CSS grid-template-rows starts at 0fr)
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.accordion-card').forEach(function (card) {
+                card.classList.add('open');
+                card.querySelector('.accordion-header').setAttribute('aria-expanded', 'true');
+            });
+        });
+    </script>
+}

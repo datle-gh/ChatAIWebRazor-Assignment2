@@ -25,6 +25,12 @@ public partial class ChatAIWebDbContext : DbContext
 
     public virtual DbSet<DocumentChunkEmbedding> DocumentChunkEmbeddings { get; set; }
 
+    public virtual DbSet<DocumentConflictCandidate> DocumentConflictCandidates { get; set; }
+
+    public virtual DbSet<DocumentConflictFinding> DocumentConflictFindings { get; set; }
+
+    public virtual DbSet<DocumentConflictReview> DocumentConflictReviews { get; set; }
+
     public virtual DbSet<EvaluationQuestion> EvaluationQuestions { get; set; }
 
     public virtual DbSet<RagasBenchmarkResult> RagasBenchmarkResults { get; set; }
@@ -177,6 +183,96 @@ public partial class ChatAIWebDbContext : DbContext
             entity.HasOne(d => d.DocumentChunk).WithMany(p => p.DocumentChunkEmbeddings)
                 .HasForeignKey(d => d.DocumentChunkId)
                 .HasConstraintName("FK_DocumentChunkEmbeddings_DocumentChunks");
+        });
+
+        modelBuilder.Entity<DocumentConflictReview>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_DocumentConflictReviews");
+
+            entity.HasIndex(e => e.NewDocumentId, "IX_DocumentConflictReviews_NewDocumentId");
+
+            entity.HasIndex(e => e.SubjectId, "IX_DocumentConflictReviews_SubjectId");
+
+            entity.HasIndex(e => e.Status, "IX_DocumentConflictReviews_Status");
+
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.HighestSimilarityScore).HasColumnType("decimal(9, 6)");
+            entity.Property(e => e.ResolutionChoice).HasMaxLength(50);
+            entity.Property(e => e.ResolvedAt).HasPrecision(0);
+            entity.Property(e => e.Status)
+                .HasMaxLength(30)
+                .HasDefaultValue("Pending");
+
+            entity.HasOne(d => d.NewDocument).WithMany(p => p.ConflictReviewsAsNewDocument)
+                .HasForeignKey(d => d.NewDocumentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_DocumentConflictReviews_NewDocument");
+
+            entity.HasOne(d => d.ResolvedByNavigation).WithMany(p => p.ResolvedDocumentConflictReviews)
+                .HasForeignKey(d => d.ResolvedBy)
+                .HasConstraintName("FK_DocumentConflictReviews_ResolvedBy");
+
+            entity.HasOne(d => d.Subject).WithMany(p => p.DocumentConflictReviews)
+                .HasForeignKey(d => d.SubjectId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_DocumentConflictReviews_Subjects");
+        });
+
+        modelBuilder.Entity<DocumentConflictCandidate>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_DocumentConflictCandidates");
+
+            entity.HasIndex(e => e.CandidateDocumentId, "IX_DocumentConflictCandidates_CandidateDocumentId");
+
+            entity.HasIndex(e => e.ReviewId, "IX_DocumentConflictCandidates_ReviewId");
+
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.MaxSimilarityScore).HasColumnType("decimal(9, 6)");
+
+            entity.HasOne(d => d.CandidateDocument).WithMany(p => p.ConflictCandidateDocuments)
+                .HasForeignKey(d => d.CandidateDocumentId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_DocumentConflictCandidates_Documents");
+
+            entity.HasOne(d => d.Review).WithMany(p => p.Candidates)
+                .HasForeignKey(d => d.ReviewId)
+                .HasConstraintName("FK_DocumentConflictCandidates_Reviews");
+        });
+
+        modelBuilder.Entity<DocumentConflictFinding>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_DocumentConflictFindings");
+
+            entity.HasIndex(e => e.CandidateId, "IX_DocumentConflictFindings_CandidateId");
+
+            entity.HasIndex(e => e.ExistingChunkId, "IX_DocumentConflictFindings_ExistingChunkId");
+
+            entity.HasIndex(e => e.NewChunkId, "IX_DocumentConflictFindings_NewChunkId");
+
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.Severity).HasMaxLength(30);
+            entity.Property(e => e.SimilarityScore).HasColumnType("decimal(9, 6)");
+            entity.Property(e => e.TextSimilarityScore).HasColumnType("decimal(9, 6)");
+
+            entity.HasOne(d => d.Candidate).WithMany(p => p.Findings)
+                .HasForeignKey(d => d.CandidateId)
+                .HasConstraintName("FK_DocumentConflictFindings_Candidates");
+
+            entity.HasOne(d => d.ExistingChunk).WithMany(p => p.ConflictFindingsAsExistingChunk)
+                .HasForeignKey(d => d.ExistingChunkId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_DocumentConflictFindings_ExistingChunk");
+
+            entity.HasOne(d => d.NewChunk).WithMany(p => p.ConflictFindingsAsNewChunk)
+                .HasForeignKey(d => d.NewChunkId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_DocumentConflictFindings_NewChunk");
         });
 
         modelBuilder.Entity<EvaluationQuestion>(entity =>

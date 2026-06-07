@@ -27,6 +27,7 @@ The project follows a 3-layer architecture for the PRN222/FPT course: `Presentat
 - Extract text from documents, split into chunks, generate embeddings.
 - RAG chatbot answers questions based on uploaded documents.
 - Display citations by document, page/slide, chunk, and similarity score.
+- Detect near-duplicate or conflicting uploaded documents and require the subject head teacher to choose the correct source.
 - Store conversation history by user/subject.
 - Benchmark chat/RAG with an evaluation question set.
 - Support for multiple embedding models:
@@ -418,7 +419,9 @@ Upload document
 → Generate embeddings
 → Save SQL metadata
 → Upsert Qdrant if available
-→ Mark document as Indexed
+→ Compare against similar indexed documents in the same subject
+→ Mark as NeedsReview if conflicts are found
+→ Otherwise mark document as Indexed
 
 Student question
 → Generate question embedding
@@ -670,13 +673,23 @@ The upload page gets the subject list according to the rule in `DocumentService.
 
 In the current version:
 
-- Admin sees all subjects.
-- Teacher sees all subjects.
-- Student cannot upload.
+- Only teachers who are the head teacher/creator of a subject can upload documents for that subject.
+- Admins do not upload documents through the upload page.
+- Students cannot upload.
 
-If you want to restrict teachers to only upload assigned subjects, change the service to use `GetUploadableByTeacherAsync`.
+This matches the project rule that only the subject head teacher uploads learning materials. If a teacher does not see a subject, check whether that teacher is the subject creator/head teacher in the seeded data.
 
-### 7. Build is locked by a DLL file
+### 7. Uploaded document is marked as NeedsReview
+
+After indexing, the app compares the new document chunks with similar indexed documents in the same subject. If it finds likely content conflicts, the document is held out of RAG and marked `NeedsReview`.
+
+The subject head teacher should open the conflict report, review the chunk-level differences, then choose one of these actions:
+
+- Select the new document as correct.
+- Keep the existing document.
+- Confirm there is no conflict.
+
+### 8. Build is locked by a DLL file
 
 If the build reports:
 

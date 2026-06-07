@@ -63,6 +63,10 @@ public sealed class DocumentRepository : IDocumentRepository
         {
             query = query.Where(document => document.Status == status.Value);
         }
+        else
+        {
+            query = query.Where(document => document.Status != DocumentStatus.Deleted);
+        }
 
         return await query
             .OrderByDescending(document => document.UploadedAt)
@@ -88,7 +92,10 @@ public sealed class DocumentRepository : IDocumentRepository
 
         document.Status = status;
         document.ErrorMessage = errorMessage;
-        document.IndexedAt = indexedAt;
+        if (indexedAt.HasValue || status == DocumentStatus.Indexed)
+        {
+            document.IndexedAt = indexedAt;
+        }
 
         await _context.SaveChangesAsync(cancellationToken);
     }

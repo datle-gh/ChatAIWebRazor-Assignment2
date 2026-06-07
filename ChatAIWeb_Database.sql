@@ -24,6 +24,10 @@ DROP TABLE IF EXISTS dbo.EvaluationQuestions;
 DROP TABLE IF EXISTS dbo.Citations;
 DROP TABLE IF EXISTS dbo.ChatMessages;
 DROP TABLE IF EXISTS dbo.ChatSessions;
+DROP TABLE IF EXISTS dbo.DocumentConflictFindings;
+DROP TABLE IF EXISTS dbo.DocumentConflictCandidates;
+DROP TABLE IF EXISTS dbo.DocumentConflictReviews;
+DROP TABLE IF EXISTS dbo.DocumentChunkEmbeddings;
 DROP TABLE IF EXISTS dbo.DocumentChunks;
 DROP TABLE IF EXISTS dbo.Documents;
 DROP TABLE IF EXISTS dbo.SubjectEnrollments;
@@ -124,8 +128,21 @@ BEGIN
         CONSTRAINT FK_Documents_Subjects FOREIGN KEY (SubjectId) REFERENCES dbo.Subjects(Id),
         CONSTRAINT FK_Documents_Users_UploadedBy FOREIGN KEY (UploadedBy) REFERENCES dbo.Users(Id),
         CONSTRAINT CK_Documents_FileType CHECK (FileType IN (N'PDF', N'DOCX', N'PPTX', N'TXT')),
-        CONSTRAINT CK_Documents_Status CHECK (Status IN (N'Uploaded', N'Processing', N'Indexed', N'Failed', N'Deleted'))
+        CONSTRAINT CK_Documents_Status CHECK (Status IN (N'Uploaded', N'Processing', N'Indexed', N'Failed', N'Rejected', N'NeedsReview', N'Deleted'))
     );
+END
+GO
+
+IF OBJECT_ID(N'dbo.CK_Documents_Status', N'C') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.Documents DROP CONSTRAINT CK_Documents_Status;
+END
+GO
+
+IF OBJECT_ID(N'dbo.CK_Documents_Status', N'C') IS NULL
+BEGIN
+    ALTER TABLE dbo.Documents
+    ADD CONSTRAINT CK_Documents_Status CHECK (Status IN (N'Uploaded', N'Processing', N'Indexed', N'Failed', N'Rejected', N'NeedsReview', N'Deleted'));
 END
 GO
 
@@ -177,6 +194,95 @@ BEGIN
         CONSTRAINT FK_DocumentChunkEmbeddings_DocumentChunks FOREIGN KEY (DocumentChunkId) REFERENCES dbo.DocumentChunks(Id) ON DELETE CASCADE,
         CONSTRAINT UQ_DocumentChunkEmbeddings_Chunk_Model UNIQUE (DocumentChunkId, EmbeddingModel)
     );
+END
+GO
+
+/* =========================================================
+   6.1. DocumentConflictReviews
+   Stores conflict review sessions for documents that need head-teacher approval.
+   ========================================================= */
+IF OBJECT_ID(N'dbo.DocumentConflictReviews', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DocumentConflictReviews
+    (
+        Id                      INT IDENTITY(1,1) PRIMARY KEY,
+        SubjectId               INT NOT NULL,
+        NewDocumentId           INT NOT NULL,
+        Status                  NVARCHAR(30) NOT NULL CONSTRAINT DF_DocumentConflictReviews_Status DEFAULT N'Pending',
+        Summary                 NVARCHAR(MAX) NOT NULL,
+        HighestSimilarityScore  DECIMAL(9,6) NOT NULL,
+        FindingCount            INT NOT NULL,
+        ResolutionChoice        NVARCHAR(50) NULL,
+        ResolvedBy              INT NULL,
+        ResolvedAt              DATETIME2(0) NULL,
+        ResolutionNote          NVARCHAR(MAX) NULL,
+        CreatedAt               DATETIME2(0) NOT NULL CONSTRAINT DF_DocumentConflictReviews_CreatedAt DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_DocumentConflictReviews_Subjects FOREIGN KEY (SubjectId) REFERENCES dbo.Subjects(Id),
+        CONSTRAINT FK_DocumentConflictReviews_NewDocument FOREIGN KEY (NewDocumentId) REFERENCES dbo.Documents(Id),
+        CONSTRAINT FK_DocumentConflictReviews_ResolvedBy FOREIGN KEY (ResolvedBy) REFERENCES dbo.Users(Id),
+        CONSTRAINT CK_DocumentConflictReviews_Status CHECK (Status IN (N'Pending', N'Resolved')),
+        CONSTRAINT CK_DocumentConflictReviews_ResolutionChoice CHECK (ResolutionChoice IS NULL OR ResolutionChoice IN (N'AcceptNew', N'KeepExisting', N'NoConflict'))
+    );
+END
+GO
+
+/* =========================================================
+   6.2. DocumentConflictCandidates
+   Stores indexed documents that were close enough to compare with a new document.
+   ========================================================= */
+IF OBJECT_ID(N'dbo.DocumentConflictCandidates', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DocumentConflictCandidates
+    (
+        Id                   INT IDENTITY(1,1) PRIMARY KEY,
+        ReviewId             INT NOT NULL,
+        CandidateDocumentId  INT NOT NULL,
+        MaxSimilarityScore   DECIMAL(9,6) NOT NULL,
+        FindingCount         INT NOT NULL,
+        Summary              NVARCHAR(MAX) NULL,
+        CreatedAt            DATETIME2(0) NOT NULL CONSTRAINT DF_DocumentConflictCandidates_CreatedAt DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_DocumentConflictCandidates_Reviews FOREIGN KEY (ReviewId) REFERENCES dbo.DocumentConflictReviews(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_DocumentConflictCandidates_Documents FOREIGN KEY (CandidateDocumentId) REFERENCES dbo.Documents(Id)
+    );
+END
+GO
+
+/* =========================================================
+   6.3. DocumentConflictFindings
+   Stores chunk-level differences for audit and teacher review.
+   ========================================================= */
+IF OBJECT_ID(N'dbo.DocumentConflictFindings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DocumentConflictFindings
+    (
+        Id                INT IDENTITY(1,1) PRIMARY KEY,
+        CandidateId       INT NOT NULL,
+        NewChunkId        INT NOT NULL,
+        ExistingChunkId   INT NOT NULL,
+        SimilarityScore   DECIMAL(9,6) NOT NULL,
+        TextSimilarityScore DECIMAL(9,6) NOT NULL CONSTRAINT DF_DocumentConflictFindings_TextSimilarityScore DEFAULT 0,
+        Severity          NVARCHAR(30) NOT NULL,
+        Explanation       NVARCHAR(MAX) NOT NULL,
+        NewSnippet        NVARCHAR(MAX) NOT NULL,
+        ExistingSnippet   NVARCHAR(MAX) NOT NULL,
+        CreatedAt         DATETIME2(0) NOT NULL CONSTRAINT DF_DocumentConflictFindings_CreatedAt DEFAULT SYSUTCDATETIME(),
+
+        CONSTRAINT FK_DocumentConflictFindings_Candidates FOREIGN KEY (CandidateId) REFERENCES dbo.DocumentConflictCandidates(Id) ON DELETE CASCADE,
+        CONSTRAINT FK_DocumentConflictFindings_NewChunk FOREIGN KEY (NewChunkId) REFERENCES dbo.DocumentChunks(Id),
+        CONSTRAINT FK_DocumentConflictFindings_ExistingChunk FOREIGN KEY (ExistingChunkId) REFERENCES dbo.DocumentChunks(Id),
+        CONSTRAINT CK_DocumentConflictFindings_Severity CHECK (Severity IN (N'Low', N'Medium', N'High'))
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.DocumentConflictFindings', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.DocumentConflictFindings', N'TextSimilarityScore') IS NULL
+BEGIN
+    ALTER TABLE dbo.DocumentConflictFindings
+    ADD TextSimilarityScore DECIMAL(9,6) NOT NULL
+        CONSTRAINT DF_DocumentConflictFindings_TextSimilarityScore DEFAULT 0;
 END
 GO
 
@@ -308,6 +414,14 @@ CREATE INDEX IX_DocumentChunks_DocumentId ON dbo.DocumentChunks(DocumentId);
 CREATE INDEX IX_DocumentChunks_VectorId ON dbo.DocumentChunks(VectorId) WHERE VectorId IS NOT NULL;
 CREATE INDEX IX_DocumentChunkEmbeddings_DocumentChunkId ON dbo.DocumentChunkEmbeddings(DocumentChunkId);
 CREATE INDEX IX_DocumentChunkEmbeddings_VectorId ON dbo.DocumentChunkEmbeddings(VectorId) WHERE VectorId IS NOT NULL;
+CREATE INDEX IX_DocumentConflictReviews_NewDocumentId ON dbo.DocumentConflictReviews(NewDocumentId);
+CREATE INDEX IX_DocumentConflictReviews_SubjectId ON dbo.DocumentConflictReviews(SubjectId);
+CREATE INDEX IX_DocumentConflictReviews_Status ON dbo.DocumentConflictReviews(Status);
+CREATE INDEX IX_DocumentConflictCandidates_ReviewId ON dbo.DocumentConflictCandidates(ReviewId);
+CREATE INDEX IX_DocumentConflictCandidates_CandidateDocumentId ON dbo.DocumentConflictCandidates(CandidateDocumentId);
+CREATE INDEX IX_DocumentConflictFindings_CandidateId ON dbo.DocumentConflictFindings(CandidateId);
+CREATE INDEX IX_DocumentConflictFindings_NewChunkId ON dbo.DocumentConflictFindings(NewChunkId);
+CREATE INDEX IX_DocumentConflictFindings_ExistingChunkId ON dbo.DocumentConflictFindings(ExistingChunkId);
 CREATE INDEX IX_ChatSessions_UserId ON dbo.ChatSessions(UserId);
 CREATE INDEX IX_ChatSessions_SubjectId ON dbo.ChatSessions(SubjectId);
 CREATE INDEX IX_ChatMessages_ChatSessionId ON dbo.ChatMessages(ChatSessionId);

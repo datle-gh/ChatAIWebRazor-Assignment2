@@ -34,6 +34,10 @@ public partial class Document
 
     public virtual ICollection<Citation> Citations { get; set; } = new List<Citation>();
 
+    public virtual ICollection<DocumentConflictCandidate> ConflictCandidateDocuments { get; set; } = new List<DocumentConflictCandidate>();
+
+    public virtual ICollection<DocumentConflictReview> ConflictReviewsAsNewDocument { get; set; } = new List<DocumentConflictReview>();
+
     public virtual ICollection<DocumentChunk> DocumentChunks { get; set; } = new List<DocumentChunk>();
 
     public virtual Subject Subject { get; set; } = null!;

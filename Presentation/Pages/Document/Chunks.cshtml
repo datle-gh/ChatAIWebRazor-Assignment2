@@ -85,7 +85,7 @@
                     <a class="chunk-page-btn @(Model.ViewModel.CurrentPage <= 1 ? "disabled" : "")"
                        asp-page="/Document/Chunks"
                        asp-route-id="@Model.ViewModel.DocumentId"
-                       asp-route-page="@previousPage"
+                       asp-route-currentPage="@previousPage"
                        asp-route-pageSize="@Model.ViewModel.PageSize">
                         <span class="material-symbols-outlined">chevron_left</span>
                         Trước
@@ -96,7 +96,7 @@
                     <a class="chunk-page-btn @(Model.ViewModel.CurrentPage >= Model.ViewModel.TotalPages ? "disabled" : "")"
                        asp-page="/Document/Chunks"
                        asp-route-id="@Model.ViewModel.DocumentId"
-                       asp-route-page="@nextPage"
+                       asp-route-currentPage="@nextPage"
                        asp-route-pageSize="@Model.ViewModel.PageSize">
                         Sau
                         <span class="material-symbols-outlined">chevron_right</span>
@@ -506,6 +506,8 @@
             DocumentStatus.Processing => "status-processing",
             DocumentStatus.Failed => "status-failed",
             DocumentStatus.Rejected => "status-rejected",
+            DocumentStatus.NeedsReview => "status-needs-review",
+            DocumentStatus.Deleted => "status-failed",
             DocumentStatus.Uploaded => "status-uploaded",
             _ => "status-uploaded"
         };
@@ -515,11 +517,13 @@
     {
         return status switch
         {
-            DocumentStatus.Uploaded => "Chờ duyệt",
+            DocumentStatus.Uploaded => "Chờ xử lý",
             DocumentStatus.Processing => "Đang xử lý",
             DocumentStatus.Indexed => "Đã index",
             DocumentStatus.Failed => "Lỗi",
             DocumentStatus.Rejected => "Từ chối",
+            DocumentStatus.NeedsReview => "Cần kiểm tra",
+            DocumentStatus.Deleted => "Đã xóa mềm",
             _ => status.ToString()
         };
     }

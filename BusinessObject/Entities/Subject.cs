@@ -23,6 +23,8 @@ public partial class Subject
 
     public virtual User? CreatedByNavigation { get; set; }
 
+    public virtual ICollection<DocumentConflictReview> DocumentConflictReviews { get; set; } = new List<DocumentConflictReview>();
+
     public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
 
     public virtual ICollection<EvaluationQuestion> EvaluationQuestions { get; set; } = new List<EvaluationQuestion>();

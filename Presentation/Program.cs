@@ -60,6 +60,7 @@ builder.Services.AddDbContext<ChatAIWebDbContext>(options =>
 
 // ==================== Services injection ====================
 builder.Services.AddScoped<IDocumentService, DocumentService>();
+builder.Services.AddScoped<IDocumentConflictService, DocumentConflictService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IUserManagementService, UserManagementService>();
@@ -94,6 +95,7 @@ builder.Services.Configure<SystemSettingsFilePathOptions>(options =>
 builder.Services.AddScoped<ISystemSettingsService, SystemSettingsService>();
 // ==================== Repository injection ====================
 builder.Services.AddScoped<IDocumentRepository, DocumentRepository>();
+builder.Services.AddScoped<IDocumentConflictRepository, DocumentConflictRepository>();
 builder.Services.AddScoped<IDocumentChunkRepository, DocumentChunkRepository>();
 builder.Services.AddScoped<IDocumentChunkEmbeddingRepository, DocumentChunkEmbeddingRepository>();
 builder.Services.AddScoped<IChatRepository, ChatRepository>();

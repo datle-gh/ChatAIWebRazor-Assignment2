@@ -29,6 +29,10 @@ public partial class DocumentChunk
 
     public virtual ICollection<Citation> Citations { get; set; } = new List<Citation>();
 
+    public virtual ICollection<DocumentConflictFinding> ConflictFindingsAsExistingChunk { get; set; } = new List<DocumentConflictFinding>();
+
+    public virtual ICollection<DocumentConflictFinding> ConflictFindingsAsNewChunk { get; set; } = new List<DocumentConflictFinding>();
+
     public virtual ICollection<DocumentChunkEmbedding> DocumentChunkEmbeddings { get; set; } = new List<DocumentChunkEmbedding>();
 
     public virtual Document Document { get; set; } = null!;

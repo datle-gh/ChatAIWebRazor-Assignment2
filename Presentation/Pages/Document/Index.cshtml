@@ -5,8 +5,8 @@
 
 @{
     bool isStudent = User.IsInRole("Student");
-    bool canUpload = User.IsInRole("Admin") || User.IsInRole("Teacher");
     bool inSubjectView = Model.ViewModel.SubjectId.HasValue;
+    bool canUpload = inSubjectView && Model.ViewModel.CanUploadCurrentSubject;
     var selectedSubject = inSubjectView ? Model.ViewModel.Subjects.FirstOrDefault(s => s.Id == Model.ViewModel.SubjectId) : null;
 
     ViewData["Title"] = inSubjectView
@@ -164,6 +164,16 @@ else
                                         </div>
                                         <div class="min-w-0 flex-grow-1">
                                             <span class="doc-detail-filename">@doc.OriginalFileName</span>
+                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                <span class="status-badge @GetStatusClass(doc.Status)">@GetStatusText(doc.Status)</span>
+                                                @if (doc.Status == DocumentStatus.NeedsReview)
+                                                {
+                                                    <span class="chip">
+                                                        <span class="material-symbols-outlined" style="font-size:0.95rem" aria-hidden="true">rule</span>
+                                                        Cần trưởng bộ môn kiểm tra
+                                                    </span>
+                                                }
+                                            </div>
                                             <div class="doc-verify-progress @(doc.Status == DocumentStatus.Processing ? "" : "d-none") mt-2"
                                                  data-verify-progress="@doc.Id"
                                                  data-upload-id="verify-@doc.Id">
@@ -188,21 +198,14 @@ else
                                     <div class="d-flex justify-content-end gap-1">
                                         @if (!isStudent)
                                         {
-                                            @if (doc.Status is DocumentStatus.Uploaded or DocumentStatus.Failed)
+                                            @if (doc.Status == DocumentStatus.NeedsReview)
                                             {
-                                                <button class="doc-row-btn doc-row-btn-primary open-review-modal"
-                                                        type="button"
-                                                        data-bs-toggle="modal"
-                                                        data-bs-target="#documentReviewModal"
-                                                        data-document-id="@doc.Id"
-                                                        data-document-name="@doc.OriginalFileName"
-                                                        data-upload-id="verify-@doc.Id"
-                                                        data-verify-url="@Url.Page("/Document/Verify", new { id = doc.Id, subjectId = Model.ViewModel.SubjectId })"
-                                                        data-reject-url="@Url.Page("/Document/Reject", new { id = doc.Id, subjectId = Model.ViewModel.SubjectId })"
-                                                        title="Duyệt hoặc từ chối tài liệu">
-                                                        <span class="material-symbols-outlined" style="font-size:1rem">verified</span>
-                                                        <span>Duyệt</span>
-                                                    </button>
+                                                <a class="doc-row-btn doc-row-btn-primary"
+                                                   href="@Url.Page("/DocumentConflictReview/Details", new { documentId = doc.Id })"
+                                                   title="Xem báo cáo sai lệch">
+                                                    <span class="material-symbols-outlined" style="font-size:1rem">rule</span>
+                                                    <span>Sai lệch</span>
+                                                </a>
                                             }
                                             <a class="doc-row-btn doc-row-btn-primary"
                                                href="@Url.Page("/Document/Chunks", new { id = doc.Id })"
@@ -211,18 +214,21 @@ else
                                                 <span>Xem</span>
                                             </a>
                                         }
-                                        <a class="doc-row-btn doc-row-btn-download"
-                                           href="@Url.Page("/Document/Download", new { id = doc.Id })"
-                                           title="Tải xuống tài liệu"
-                                           download>
-                                            <span class="material-symbols-outlined" style="font-size:1rem">download</span>
-                                            <span>Tải</span>
-                                        </a>
-                                        <button class="doc-row-btn doc-row-btn-secondary" type="button" title="Đặt câu hỏi về tài liệu"
-                                                onclick="window.location='@Url.Page("/Chat/Index", new { subjectId = doc.SubjectId })'">
-                                            <span class="material-symbols-outlined" style="font-size:1rem">psychology</span>
-                                            <span>Hỏi AI</span>
-                                        </button>
+                                        @if (doc.Status == DocumentStatus.Indexed)
+                                        {
+                                            <a class="doc-row-btn doc-row-btn-download"
+                                               href="@Url.Page("/Document/Download", new { id = doc.Id })"
+                                               title="Tải xuống tài liệu"
+                                               download>
+                                                <span class="material-symbols-outlined" style="font-size:1rem">download</span>
+                                                <span>Tải</span>
+                                            </a>
+                                            <button class="doc-row-btn doc-row-btn-secondary" type="button" title="Đặt câu hỏi về tài liệu"
+                                                    onclick="window.location='@Url.Page("/Chat/Index", new { subjectId = doc.SubjectId })'">
+                                                <span class="material-symbols-outlined" style="font-size:1rem">psychology</span>
+                                                <span>Hỏi AI</span>
+                                            </button>
+                                        }
                                     </div>
                                 </td>
                             </tr>
@@ -231,85 +237,6 @@ else
                 </table>
             </div>
         }
-    </div>
-}
-
-@if (!isStudent)
-{
-    <div class="modal fade" id="documentReviewModal" tabindex="-1" aria-labelledby="documentReviewModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" style="max-width:620px">
-            <div class="modal-content review-modal-card">
-
-                
-                <div class="review-modal-header">
-                    <div class="review-modal-header-icon">
-                        <span class="material-symbols-outlined icon-fill" aria-hidden="true">verified_user</span>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <p class="review-modal-eyebrow mb-0">Kiểm duyệt tài liệu</p>
-                        <h2 class="review-modal-title" id="documentReviewModalLabel">Xem xét &amp; Phê duyệt</h2>
-                    </div>
-                    <button type="button" class="review-modal-close" data-bs-dismiss="modal" aria-label="Đóng">
-                        <span class="material-symbols-outlined" style="font-size:1.1rem">close</span>
-                    </button>
-                </div>
-
-                <div class="modal-body p-0">
-
-                    
-                    <div class="review-modal-file-wrap">
-                        <div class="review-modal-file-chip">
-                            <span class="review-modal-file-icon">
-                                <span class="material-symbols-outlined icon-fill" aria-hidden="true">description</span>
-                            </span>
-                            <span class="review-modal-file-name" id="documentReviewFileName">--</span>
-                        </div>
-                    </div>
-
-                    
-                    <div class="alert alert-danger d-none mx-4 mb-0" data-review-error role="alert"></div>
-
-                    
-                    <div class="review-modal-section">
-                        <div class="review-modal-section-label">
-                            <span class="material-symbols-outlined" aria-hidden="true">block</span>
-                            Lý do từ chối <span class="text-muted fw-normal" style="font-size:0.78rem">(không bắt buộc)</span>
-                        </div>
-                        <form id="documentReviewRejectForm" method="post">
-                            @Html.AntiForgeryToken()
-                            <textarea class="form-control review-modal-textarea"
-                                      id="rejectReason"
-                                      name="reason"
-                                      rows="3"
-                                      maxlength="500"
-                                      placeholder="Ví dụ: Tài liệu chưa đúng môn học hoặc nội dung chưa đủ rõ."></textarea>
-                        </form>
-                        <form id="documentReviewApproveForm" method="post">
-                            @Html.AntiForgeryToken()
-                        </form>
-                    </div>
-
-                </div>
-
-                
-                <div class="review-modal-footer">
-                    <button type="button" class="review-btn review-btn-ghost" data-bs-dismiss="modal">Hủy bỏ</button>
-                    <div class="d-flex gap-2">
-                        <button type="submit" form="documentReviewRejectForm"
-                                class="review-btn review-btn-reject" data-review-reject-button>
-                            <span class="material-symbols-outlined" style="font-size:1rem">cancel</span>
-                            Từ chối
-                        </button>
-                        <button type="submit" form="documentReviewApproveForm"
-                                class="review-btn review-btn-approve" data-review-approve-button>
-                            <span class="material-symbols-outlined" style="font-size:1rem">verified</span>
-                            Duyệt &amp; Index
-                        </button>
-                    </div>
-                </div>
-
-            </div>
-        </div>
     </div>
 }
 
@@ -608,210 +535,6 @@ else
         color: #0a58ca;
     }
 
-    /* ── Premium Review Modal ── */
-    .review-modal-card {
-        border: 0;
-        border-radius: 20px;
-        overflow: hidden;
-        box-shadow: 0 24px 60px rgba(15,23,42,0.2),
-                    0 4px 12px rgba(79,70,229,0.1);
-    }
-
-    .review-modal-header {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 24px 28px 20px;
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        color: #fff;
-    }
-
-    .review-modal-header-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 48px;
-        height: 48px;
-        background: rgba(255,255,255,0.2);
-        border: 1.5px solid rgba(255,255,255,0.3);
-        border-radius: 14px;
-        flex-shrink: 0;
-    }
-
-    .review-modal-header-icon .material-symbols-outlined {
-        font-size: 1.6rem;
-        color: #fff;
-    }
-
-    .review-modal-title {
-        font-family: 'Be Vietnam Pro', sans-serif;
-        font-size: 1.2rem;
-        font-weight: 700;
-        margin: 0;
-        color: #fff;
-        line-height: 1.3;
-    }
-
-    .review-modal-eyebrow {
-        color: rgba(255,255,255,0.75);
-        font-size: 0.72rem;
-        font-weight: 600;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-    }
-
-    .review-modal-close {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        margin-left: auto;
-        flex-shrink: 0;
-        background: rgba(255,255,255,0.15);
-        border: 0;
-        border-radius: 8px;
-        color: #fff;
-        cursor: pointer;
-        transition: background 150ms ease;
-    }
-
-    .review-modal-close:hover {
-        background: rgba(255,255,255,0.28);
-    }
-
-    .review-modal-file-wrap {
-        padding: 24px 28px 14px;
-    }
-
-    .review-modal-file-chip {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 14px 18px;
-        background: var(--surface-container);
-        border: 1.5px solid rgba(79,70,229,0.15);
-        border-radius: 12px;
-        overflow: hidden;
-    }
-
-    .review-modal-file-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 38px;
-        height: 38px;
-        background: rgba(79,70,229,0.1);
-        border-radius: 8px;
-        flex-shrink: 0;
-    }
-
-    .review-modal-file-icon .material-symbols-outlined {
-        font-size: 1.2rem;
-        color: var(--primary-container);
-    }
-
-    .review-modal-file-name {
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: var(--on-surface);
-        overflow-wrap: anywhere;
-        line-height: 1.4;
-        min-width: 0;
-    }
-
-    .review-modal-section {
-        padding: 4px 28px 22px;
-    }
-
-    .review-modal-section-label {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 0.8rem;
-        font-weight: 700;
-        color: var(--on-surface-variant);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 10px;
-        font-family: 'Inter', sans-serif;
-    }
-
-    .review-modal-section-label .material-symbols-outlined {
-        font-size: 1rem;
-        color: var(--danger);
-    }
-
-    .review-modal-textarea {
-        border-radius: 10px;
-        border: 1.5px solid var(--outline-variant);
-        font-size: 0.9rem;
-        transition: border-color 180ms ease, box-shadow 180ms ease;
-        resize: vertical;
-    }
-
-    .review-modal-textarea:focus {
-        border-color: var(--primary-container);
-        box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
-    }
-
-    .review-modal-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 18px 28px;
-        background: var(--surface-container);
-        border-top: 1px solid rgba(199,196,216,0.45);
-    }
-
-    .review-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 9px 18px;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        font-weight: 600;
-        font-family: 'Inter', sans-serif;
-        cursor: pointer;
-        border: 0;
-        transition: background 160ms ease, transform 100ms ease, box-shadow 160ms ease;
-    }
-
-    .review-btn:active { transform: scale(0.97); }
-
-    .review-btn-ghost {
-        background: transparent;
-        color: var(--on-surface-variant);
-        border: 1.5px solid var(--outline-variant);
-    }
-
-    .review-btn-ghost:hover { background: var(--surface-low); }
-
-    .review-btn-reject {
-        background: rgba(220,53,69,0.08);
-        color: var(--danger);
-        border: 1.5px solid rgba(220,53,69,0.25);
-    }
-
-    .review-btn-reject:hover {
-        background: rgba(220,53,69,0.15);
-        box-shadow: 0 4px 12px rgba(220,53,69,0.15);
-    }
-
-    .review-btn-approve {
-        background: linear-gradient(135deg, #4f46e5, #7c3aed);
-        color: #fff;
-        box-shadow: 0 4px 12px rgba(79,70,229,0.25);
-    }
-
-    .review-btn-approve:hover {
-        background: linear-gradient(135deg, #4338ca, #6d28d9);
-        box-shadow: 0 6px 18px rgba(79,70,229,0.35);
-        transform: translateY(-1px);
-    }
-
     .doc-detail-panel {
         margin: 12px 0 16px;
         padding: 20px;
@@ -838,20 +561,9 @@ else
     <script>
         (() => {
             const progressBlocks = Array.from(document.querySelectorAll('[data-verify-progress]'));
-            const reviewButtons = Array.from(document.querySelectorAll('.open-review-modal'));
-            const verifyForms = [];
-            if (progressBlocks.length === 0 && reviewButtons.length === 0) {
+            if (progressBlocks.length === 0) {
                 return;
             }
-
-            const reviewModal = document.getElementById('documentReviewModal');
-            const approveForm = document.getElementById('documentReviewApproveForm');
-            const rejectForm = document.getElementById('documentReviewRejectForm');
-            const fileNameLabel = document.getElementById('documentReviewFileName');
-            const rejectReason = document.getElementById('rejectReason');
-            const reviewError = document.querySelector('[data-review-error]');
-            const approveButton = document.querySelector('[data-review-approve-button]');
-            const rejectButton = document.querySelector('[data-review-reject-button]');
 
             let connection;
             let startPromise;
@@ -925,170 +637,6 @@ else
             progressBlocks.forEach(block => {
                 joinUpload(block.dataset.uploadId).catch(() => {});
             });
-
-            function showReviewError(message) {
-                if (!reviewError) {
-                    return;
-                }
-
-                reviewError.textContent = message || 'Không thể xử lý tài liệu.';
-                reviewError.classList.remove('d-none');
-            }
-
-            function clearReviewError() {
-                if (reviewError) {
-                    reviewError.textContent = '';
-                    reviewError.classList.add('d-none');
-                }
-            }
-
-            function setReviewButtonsDisabled(isDisabled) {
-                if (approveButton) {
-                    approveButton.disabled = isDisabled;
-                }
-                if (rejectButton) {
-                    rejectButton.disabled = isDisabled;
-                }
-            }
-
-            reviewButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    clearReviewError();
-                    setReviewButtonsDisabled(false);
-
-                    if (approveButton) {
-                        approveButton.textContent = 'Duyệt và index';
-                    }
-                    if (rejectButton) {
-                        rejectButton.textContent = 'Từ chối';
-                    }
-                    if (fileNameLabel) {
-                        fileNameLabel.textContent = button.dataset.documentName || '--';
-                    }
-                    if (rejectReason) {
-                        rejectReason.value = '';
-                    }
-                    if (approveForm) {
-                        approveForm.action = button.dataset.verifyUrl || '';
-                        approveForm.dataset.documentId = button.dataset.documentId || '';
-                        approveForm.dataset.uploadId = button.dataset.uploadId || '';
-                    }
-                    if (rejectForm) {
-                        rejectForm.action = button.dataset.rejectUrl || '';
-                        rejectForm.dataset.documentId = button.dataset.documentId || '';
-                    }
-                });
-            });
-
-            if (approveForm) {
-                approveForm.addEventListener('submit', async event => {
-                    event.preventDefault();
-
-                    const documentId = approveForm.dataset.documentId;
-                    const uploadId = approveForm.dataset.uploadId;
-                    await joinUpload(uploadId);
-                    setProgress(Number.parseInt(documentId, 10), 5, 'Đang gửi yêu cầu duyệt tài liệu...', false, false);
-                    setReviewButtonsDisabled(true);
-                    if (approveButton) {
-                        approveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Đang duyệt';
-                    }
-
-                    try {
-                        const response = await fetch(approveForm.action, {
-                            method: 'POST',
-                            body: new FormData(approveForm),
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || !payload.succeeded) {
-                            throw new Error(payload.message || 'Không thể duyệt tài liệu.');
-                        }
-
-                        if (reviewModal && window.bootstrap) {
-                            bootstrap.Modal.getOrCreateInstance(reviewModal).hide();
-                        }
-                        setProgress(Number.parseInt(documentId, 10), 100, payload.message || 'Tài liệu đã được index.', false, true);
-                        window.setTimeout(() => window.location.reload(), 900);
-                    } catch (error) {
-                        showReviewError(error.message || 'Duyệt tài liệu thất bại.');
-                        setProgress(Number.parseInt(documentId, 10), 100, error.message || 'Duyệt tài liệu thất bại.', true, false);
-                        setReviewButtonsDisabled(false);
-                        if (approveButton) {
-                            approveButton.textContent = 'Duyệt và index';
-                        }
-                    }
-                });
-            }
-
-            if (rejectForm) {
-                rejectForm.addEventListener('submit', async event => {
-                    event.preventDefault();
-
-                    setReviewButtonsDisabled(true);
-                    if (rejectButton) {
-                        rejectButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Đang từ chối';
-                    }
-
-                    try {
-                        const response = await fetch(rejectForm.action, {
-                            method: 'POST',
-                            body: new FormData(rejectForm),
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || !payload.succeeded) {
-                            throw new Error(payload.message || 'Không thể từ chối tài liệu.');
-                        }
-
-                        window.location.reload();
-                    } catch (error) {
-                        showReviewError(error.message || 'Từ chối tài liệu thất bại.');
-                        setReviewButtonsDisabled(false);
-                        if (rejectButton) {
-                            rejectButton.textContent = 'Từ chối';
-                        }
-                    }
-                });
-            }
-
-            verifyForms.forEach(form => {
-                form.addEventListener('submit', async event => {
-                    event.preventDefault();
-
-                    const documentId = form.dataset.documentId;
-                    const uploadId = form.dataset.uploadId;
-                    const button = form.querySelector('button[type="submit"]');
-
-                    await joinUpload(uploadId);
-                    setProgress(Number.parseInt(documentId, 10), 5, 'Đang gửi yêu cầu duyệt tài liệu...', false, false);
-
-                    if (button) {
-                        button.disabled = true;
-                        button.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span><span>Đang duyệt</span>';
-                    }
-
-                    try {
-                        const response = await fetch(form.action, {
-                            method: 'POST',
-                            body: new FormData(form),
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || !payload.succeeded) {
-                            throw new Error(payload.message || 'Không thể duyệt tài liệu.');
-                        }
-
-                        setProgress(Number.parseInt(documentId, 10), 100, payload.message || 'Tài liệu đã được index.', false, true);
-                        window.setTimeout(() => window.location.reload(), 900);
-                    } catch (error) {
-                        setProgress(Number.parseInt(documentId, 10), 100, error.message || 'Duyệt tài liệu thất bại.', true, false);
-                        if (button) {
-                            button.disabled = false;
-                            button.innerHTML = '<span class="material-symbols-outlined" style="font-size:1rem">verified</span><span>Duyệt</span>';
-                        }
-                    }
-                });
-            });
         })();
     </script>
 }
@@ -1117,6 +665,8 @@ else
         DocumentStatus.Uploaded   => "status-uploaded",
         DocumentStatus.Failed     => "status-failed",
         DocumentStatus.Rejected   => "status-failed",
+        DocumentStatus.NeedsReview => "status-needs-review",
+        DocumentStatus.Deleted    => "status-failed",
         _                         => "status-uploaded"
     };
 
@@ -1124,9 +674,11 @@ else
     {
         DocumentStatus.Indexed    => "Đã Index",
         DocumentStatus.Processing => "Đang Index",
-        DocumentStatus.Uploaded   => "Chờ duyệt",
+        DocumentStatus.Uploaded   => "Chờ xử lý",
         DocumentStatus.Failed     => "Lỗi",
         DocumentStatus.Rejected   => "Đã từ chối",
+        DocumentStatus.NeedsReview => "Cần kiểm tra",
+        DocumentStatus.Deleted    => "Đã xóa mềm",
         _                         => status.ToString()
     };
 
@@ -1142,7 +694,7 @@ else
     private static string SanitizeErrorMessage(string message)
     {
         return IsTechnicalError(message)
-            ? "Có lỗi khi xử lý tài liệu. Vui lòng duyệt lại hoặc tải lại tài liệu."
+            ? "Có lỗi khi xử lý tài liệu. Vui lòng tải lại tài liệu."
             : message;
     }
 

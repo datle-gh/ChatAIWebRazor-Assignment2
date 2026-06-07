@@ -513,6 +513,12 @@ a:hover {
   border: 1px solid #fde68a;
 }
 
+.status-needs-review {
+  color: #7e3000;
+  background: #ffdbcc;
+  border: 1px solid #ffb695;
+}
+
 .status-failed {
   color: var(--danger);
   background: var(--danger-bg);

@@ -6,5 +6,7 @@ public enum DocumentStatus
     Processing,
     Indexed,
     Failed,
-    Rejected
+    Rejected,
+    NeedsReview,
+    Deleted
 }

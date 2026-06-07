@@ -27,6 +27,8 @@ public partial class User
 
     public virtual ICollection<EvaluationQuestion> EvaluationQuestions { get; set; } = new List<EvaluationQuestion>();
 
+    public virtual ICollection<DocumentConflictReview> ResolvedDocumentConflictReviews { get; set; } = new List<DocumentConflictReview>();
+
     public virtual ICollection<SubjectEnrollment> SubjectEnrollments { get; set; } = new List<SubjectEnrollment>();
 
     public virtual ICollection<Subject> Subjects { get; set; } = new List<Subject>();

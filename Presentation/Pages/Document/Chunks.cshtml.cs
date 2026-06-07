@@ -20,13 +20,15 @@ public sealed class ChunksModel : AppPageModel
 
     public async Task<IActionResult> OnGetAsync(
         int id,
-        int page = 1,
+        [FromQuery(Name = "currentPage")] int? currentPage = null,
+        [FromQuery(Name = "page")] int? legacyPage = null,
         int pageSize = 5,
         CancellationToken cancellationToken = default)
     {
+        var requestedPage = currentPage ?? legacyPage ?? 1;
         var result = await _documentService.GetDocumentChunksAsync(
             id,
-            page,
+            requestedPage,
             pageSize,
             GetCurrentUserId(),
             GetCurrentUserRole(),

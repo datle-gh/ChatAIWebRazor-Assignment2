@@ -32,6 +32,7 @@ public sealed class DocumentService : IDocumentService
     private readonly IEmbeddingModelRegistry _embeddingModelRegistry;
     private readonly IDocumentChunkEmbeddingRepository _documentChunkEmbeddingRepository;
     private readonly IVectorStoreService _vectorStoreService;
+    private readonly IDocumentConflictService _documentConflictService;
     private readonly IUploadProgressReporter _uploadProgressReporter;
     private readonly UploadSettings _uploadSettings;
     private readonly ILogger<DocumentService> _logger;
@@ -47,6 +48,7 @@ public sealed class DocumentService : IDocumentService
         IEmbeddingModelRegistry embeddingModelRegistry,
         IDocumentChunkEmbeddingRepository documentChunkEmbeddingRepository,
         IVectorStoreService vectorStoreService,
+        IDocumentConflictService documentConflictService,
         IUploadProgressReporter uploadProgressReporter,
         UploadSettings uploadSettings,
         ILogger<DocumentService> logger)
@@ -61,6 +63,7 @@ public sealed class DocumentService : IDocumentService
         _embeddingModelRegistry = embeddingModelRegistry;
         _documentChunkEmbeddingRepository = documentChunkEmbeddingRepository;
         _vectorStoreService = vectorStoreService;
+        _documentConflictService = documentConflictService;
         _uploadProgressReporter = uploadProgressReporter;
         _uploadSettings = uploadSettings;
         _logger = logger;
@@ -421,6 +424,9 @@ public sealed class DocumentService : IDocumentService
         if (document is null)
             return null;
 
+        if (document.Status is DocumentStatus.Deleted or DocumentStatus.NeedsReview)
+            return null;
+
         // Admins and teachers of the subject can download any document.
         // Students can only download indexed documents from their enrolled subjects.
         var isAdminOrTeacher =
@@ -721,6 +727,40 @@ public sealed class DocumentService : IDocumentService
             document,
             cancellationToken);
 
+        await ReportProgressAsync(
+            progressContext,
+            fileName,
+            "conflict-check",
+            95,
+            "Đang kiểm tra trùng/lệch nội dung với tài liệu đã có...",
+            cancellationToken: cancellationToken);
+
+        var conflictResult = await _documentConflictService.AnalyzeDocumentAsync(
+            document.Id,
+            defaultEmbeddingService.ModelKey,
+            cancellationToken);
+
+        if (conflictResult.HasConflicts)
+        {
+            await _documentRepository.UpdateStatusAsync(
+                document.Id,
+                DocumentStatus.NeedsReview,
+                conflictResult.Message,
+                indexedAt: DateTime.UtcNow,
+                cancellationToken: cancellationToken);
+
+            await ReportProgressAsync(
+                progressContext,
+                fileName,
+                "needs-review",
+                100,
+                "Tài liệu cần trưởng bộ môn kiểm tra sai lệch trước khi đưa vào RAG.",
+                isCompleted: true,
+                cancellationToken: cancellationToken);
+
+            return new DocumentUploadResult(true, document.Id, "Tài liệu đã được xử lý nhưng cần trưởng bộ môn kiểm tra sai lệch trước khi sử dụng.");
+        }
+
         await _documentRepository.UpdateStatusAsync(
             document.Id,
             DocumentStatus.Indexed,
@@ -771,6 +811,32 @@ public sealed class DocumentService : IDocumentService
             defaultEmbeddingService,
             document,
             cancellationToken);
+
+        var conflictResult = await _documentConflictService.AnalyzeDocumentAsync(
+            document.Id,
+            defaultEmbeddingService.ModelKey,
+            cancellationToken);
+
+        if (conflictResult.HasConflicts)
+        {
+            await _documentRepository.UpdateStatusAsync(
+                document.Id,
+                DocumentStatus.NeedsReview,
+                conflictResult.Message,
+                indexedAt: DateTime.UtcNow,
+                cancellationToken: cancellationToken);
+
+            await ReportProgressAsync(
+                progressContext,
+                document.OriginalFileName,
+                "needs-review",
+                100,
+                "Tài liệu cần trưởng bộ môn kiểm tra sai lệch trước khi đưa vào RAG.",
+                isCompleted: true,
+                cancellationToken: cancellationToken);
+
+            return new DocumentUploadResult(true, document.Id, "Tài liệu đã được duyệt nội dung nhưng cần kiểm tra sai lệch trước khi sử dụng.");
+        }
 
         await _documentRepository.UpdateStatusAsync(
             document.Id,

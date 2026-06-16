@@ -15,5 +15,8 @@ public sealed record SubjectDto(
     bool IsTeacherEnrolled,
     bool IsStudentEnrolled,
     bool CanManage,
+    bool IsDeleted,
+    DateTime? DeletedAt,
+    string? DeleteReason,
     IReadOnlyList<string> TeacherNames,
     IReadOnlyList<string> MemberNames);

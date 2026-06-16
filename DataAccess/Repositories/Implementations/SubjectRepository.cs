@@ -15,16 +15,32 @@ public sealed class SubjectRepository : ISubjectRepository
 
     public async Task<IReadOnlyList<Subject>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.Subjects
-            .AsNoTracking()
-            .Include(s => s.Documents)
-            .Include(s => s.CreatedByNavigation)
-            .Include(s => s.SubjectEnrollments)
-                .ThenInclude(e => e.User)
-            .Include(s => s.ChatSessions)
+        return await BuildSubjectQuery()
+            .Where(subject => !subject.IsDeleted)
             .OrderBy(subject => subject.SubjectCode)
             .ThenBy(subject => subject.SubjectName)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Subject>> GetAllIncludingDeletedAsync(CancellationToken cancellationToken = default)
+    {
+        return await BuildSubjectQuery()
+            .OrderBy(subject => subject.IsDeleted)
+            .ThenBy(subject => subject.SubjectCode)
+            .ThenBy(subject => subject.SubjectName)
+            .ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<Subject> BuildSubjectQuery()
+    {
+        return _context.Subjects
+            .AsNoTracking()
+            .Include(s => s.Documents)
+            .Include(s => s.CreatedByNavigation)
+            .Include(s => s.DeletedByNavigation)
+            .Include(s => s.SubjectEnrollments)
+                .ThenInclude(e => e.User)
+            .Include(s => s.ChatSessions);
     }
 
     public async Task<IReadOnlyList<Subject>> GetUploadableByTeacherAsync(
@@ -37,6 +53,7 @@ public sealed class SubjectRepository : ISubjectRepository
             .Include(s => s.CreatedByNavigation)
             .Include(s => s.SubjectEnrollments)
             .Include(s => s.ChatSessions)
+            .Where(subject => !subject.IsDeleted)
             .Where(subject =>
                 subject.CreatedBy == teacherId
                 || subject.SubjectEnrollments.Any(enrollment =>
@@ -49,12 +66,24 @@ public sealed class SubjectRepository : ISubjectRepository
 
     public async Task<Subject?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Subjects
+        return await BuildTrackedSubjectQuery()
+            .FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted, cancellationToken);
+    }
+
+    public async Task<Subject?> GetByIdIncludingDeletedAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await BuildTrackedSubjectQuery()
+            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+    }
+
+    private IQueryable<Subject> BuildTrackedSubjectQuery()
+    {
+        return _context.Subjects
             .Include(s => s.Documents)
             .Include(s => s.CreatedByNavigation)
+            .Include(s => s.DeletedByNavigation)
             .Include(s => s.SubjectEnrollments)
-                .ThenInclude(e => e.User)
-            .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+                .ThenInclude(e => e.User);
     }
 
     public async Task AddAsync(Subject subject, CancellationToken cancellationToken = default)
@@ -124,9 +153,29 @@ public sealed class SubjectRepository : ISubjectRepository
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task DeleteAsync(Subject subject, CancellationToken cancellationToken = default)
+    public async Task SoftDeleteAsync(
+        Subject subject,
+        int deletedBy,
+        string? reason,
+        CancellationToken cancellationToken = default)
     {
-        _context.Subjects.Remove(subject);
+        subject.IsDeleted = true;
+        subject.DeletedAt = DateTime.UtcNow;
+        subject.DeletedBy = deletedBy;
+        subject.DeleteReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        subject.UpdatedAt = DateTime.UtcNow;
+        _context.Subjects.Update(subject);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RestoreAsync(Subject subject, CancellationToken cancellationToken = default)
+    {
+        subject.IsDeleted = false;
+        subject.DeletedAt = null;
+        subject.DeletedBy = null;
+        subject.DeleteReason = null;
+        subject.UpdatedAt = DateTime.UtcNow;
+        _context.Subjects.Update(subject);
         await _context.SaveChangesAsync(cancellationToken);
     }
 }

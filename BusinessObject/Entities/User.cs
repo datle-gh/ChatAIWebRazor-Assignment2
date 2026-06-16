@@ -29,6 +29,10 @@ public partial class User
 
     public virtual ICollection<DocumentConflictReview> ResolvedDocumentConflictReviews { get; set; } = new List<DocumentConflictReview>();
 
+    public virtual ICollection<Notification> Notifications { get; set; } = new List<Notification>();
+
+    public virtual ICollection<Subject> DeletedSubjects { get; set; } = new List<Subject>();
+
     public virtual ICollection<SubjectEnrollment> SubjectEnrollments { get; set; } = new List<SubjectEnrollment>();
 
     public virtual ICollection<Subject> Subjects { get; set; } = new List<Subject>();

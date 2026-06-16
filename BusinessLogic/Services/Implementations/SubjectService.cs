@@ -1,5 +1,6 @@
 using BusinessLogic.DTOs.Requests;
 using BusinessLogic.DTOs.Responses;
+using BusinessLogic.Infrastructure.Interfaces;
 using BusinessLogic.Services.Interfaces;
 using BusinessObject.Entities;
 using BusinessObject.Enums;
@@ -15,21 +16,29 @@ public sealed class SubjectService : ISubjectService
     private const string FilterCreated = "created";
     private const string FilterEnrolled = "enrolled";
     private const string FilterAll = "all";
+    private const string FilterDeleted = "deleted";
+    private const string FilterActive = "active";
 
     private readonly ISubjectRepository _subjectRepository;
     private readonly IUserRepository _userRepository;
     private readonly IChatRepository _chatRepository;
+    private readonly ISubjectRealtimeNotifier _subjectRealtimeNotifier;
+    private readonly INotificationService _notificationService;
     private readonly ILogger<SubjectService> _logger;
 
     public SubjectService(
         ISubjectRepository subjectRepository,
         IUserRepository userRepository,
         IChatRepository chatRepository,
+        ISubjectRealtimeNotifier subjectRealtimeNotifier,
+        INotificationService notificationService,
         ILogger<SubjectService> logger)
     {
         _subjectRepository = subjectRepository;
         _userRepository = userRepository;
         _chatRepository = chatRepository;
+        _subjectRealtimeNotifier = subjectRealtimeNotifier;
+        _notificationService = notificationService;
         _logger = logger;
     }
 
@@ -83,11 +92,21 @@ public sealed class SubjectService : ISubjectService
         string? filter,
         CancellationToken cancellationToken = default)
     {
-        var subjects = await _subjectRepository.GetAllAsync(cancellationToken);
+        var subjects = string.Equals(currentUserRole, UserRoleNames.Admin, StringComparison.OrdinalIgnoreCase)
+            ? await _subjectRepository.GetAllIncludingDeletedAsync(cancellationToken)
+            : await _subjectRepository.GetAllAsync(cancellationToken);
+        var normalizedFilter = NormalizeManagementFilter(filter, currentUserRole);
 
         var filteredSubjects = string.Equals(currentUserRole, UserRoleNames.Teacher, StringComparison.OrdinalIgnoreCase)
             ? subjects.Where(subject => IsTeacherParticipant(subject, currentUserId))
             : subjects;
+
+        filteredSubjects = normalizedFilter switch
+        {
+            FilterDeleted => filteredSubjects.Where(subject => subject.IsDeleted),
+            FilterAll => filteredSubjects,
+            _ => filteredSubjects.Where(subject => !subject.IsDeleted)
+        };
 
         return filteredSubjects
             .Select(subject => MapToDto(subject, currentUserId, currentUserRole))
@@ -277,7 +296,14 @@ public sealed class SubjectService : ISubjectService
             roleInClass,
             cancellationToken);
 
-        return new OperationResult(true, "Đã cập nhật thành viên môn học.");
+        const string message = "Đã cập nhật thành viên môn học.";
+        await NotifySubjectMembersChangedSafelyAsync(
+            request.SubjectId,
+            "SubjectMemberAdded",
+            message,
+            cancellationToken);
+
+        return new OperationResult(true, message);
     }
 
     public async Task<OperationResult> RemoveSubjectMemberAsync(
@@ -304,7 +330,14 @@ public sealed class SubjectService : ISubjectService
         }
 
         await _subjectRepository.DeleteEnrollmentAsync(enrollmentId, cancellationToken);
-        return new OperationResult(true, "Đã xóa thành viên khỏi môn học.");
+        const string message = "Đã xóa thành viên khỏi môn học.";
+        await NotifySubjectMembersChangedSafelyAsync(
+            subjectId,
+            "SubjectMemberRemoved",
+            message,
+            cancellationToken);
+
+        return new OperationResult(true, message);
     }
 
     public async Task<OperationResult> ImportSubjectMembersAsync(
@@ -340,11 +373,19 @@ public sealed class SubjectService : ISubjectService
             }
         }
 
-        return new OperationResult(
-            imported > 0,
-            imported > 0
-                ? $"Đã import {imported} thành viên. Bỏ qua {skipped} dòng không hợp lệ."
-                : "Không có dòng nào được import. Kiểm tra email và role trong file.");
+        var message = imported > 0
+            ? $"Đã import {imported} thành viên. Bỏ qua {skipped} dòng không hợp lệ."
+            : "Không có dòng nào được import. Kiểm tra email và role trong file.";
+        if (imported > 0)
+        {
+            await NotifySubjectMembersChangedSafelyAsync(
+                request.SubjectId,
+                "SubjectMembersImported",
+                message,
+                cancellationToken);
+        }
+
+        return new OperationResult(imported > 0, message);
     }
 
     public async Task<OperationResult> CreateSubjectAsync(
@@ -380,7 +421,14 @@ public sealed class SubjectService : ISubjectService
             }
 
             _logger.LogInformation("Created subject {Code} by user {UserId}", subject.SubjectCode, request.CreatedBy);
-            return new OperationResult(true, "Tạo môn học thành công.");
+            const string message = "Tạo môn học thành công.";
+            await NotifySubjectChangedSafelyAsync(
+                subject.Id,
+                "SubjectCreated",
+                message,
+                cancellationToken);
+
+            return new OperationResult(true, message);
         }
         catch (Exception ex)
         {
@@ -425,7 +473,14 @@ public sealed class SubjectService : ISubjectService
             }
 
             _logger.LogInformation("Updated subject {Id}", subject.Id);
-            return new OperationResult(true, "Cập nhật môn học thành công.");
+            const string message = "Cập nhật môn học thành công.";
+            await NotifySubjectChangedSafelyAsync(
+                subject.Id,
+                "SubjectUpdated",
+                message,
+                cancellationToken);
+
+            return new OperationResult(true, message);
         }
         catch (Exception ex)
         {
@@ -436,24 +491,124 @@ public sealed class SubjectService : ISubjectService
 
     public async Task<OperationResult> DeleteSubjectAsync(
         int id,
+        int deletedBy,
+        string? reason,
         CancellationToken cancellationToken = default)
     {
-        var subject = await _subjectRepository.GetByIdAsync(id, cancellationToken);
+        var subject = await _subjectRepository.GetByIdIncludingDeletedAsync(id, cancellationToken);
         if (subject is null)
         {
             return new OperationResult(false, "Không tìm thấy môn học.");
         }
 
+        if (subject.IsDeleted)
+        {
+            return new OperationResult(true, "Môn học đã được xóa mềm trước đó.");
+        }
+
         try
         {
-            await _subjectRepository.DeleteAsync(subject, cancellationToken);
-            _logger.LogInformation("Deleted subject {Id}", id);
-            return new OperationResult(true, "Xóa môn học thành công.");
+            await _subjectRepository.SoftDeleteAsync(subject, deletedBy, reason, cancellationToken);
+            await _notificationService.NotifySubjectDeletedAsync(subject, cancellationToken);
+
+            _logger.LogInformation("Soft deleted subject {Id} by user {UserId}", id, deletedBy);
+            const string message = "Đã xóa mềm môn học.";
+            await NotifySubjectChangedSafelyAsync(
+                id,
+                "SubjectDeleted",
+                message,
+                cancellationToken);
+
+            return new OperationResult(true, message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to delete subject {Id}", id);
-            return new OperationResult(false, "Không thể xóa môn học. Môn học này có thể đang được sử dụng.");
+            _logger.LogError(ex, "Failed to soft delete subject {Id}", id);
+            return new OperationResult(false, "Không thể xóa mềm môn học.");
+        }
+    }
+
+    public async Task<OperationResult> RestoreSubjectAsync(
+        int id,
+        int restoredBy,
+        CancellationToken cancellationToken = default)
+    {
+        var subject = await _subjectRepository.GetByIdIncludingDeletedAsync(id, cancellationToken);
+        if (subject is null)
+        {
+            return new OperationResult(false, "Không tìm thấy môn học.");
+        }
+
+        if (!subject.IsDeleted)
+        {
+            return new OperationResult(true, "Môn học đang hoạt động.");
+        }
+
+        try
+        {
+            await _subjectRepository.RestoreAsync(subject, cancellationToken);
+            _logger.LogInformation("Restored subject {Id} by user {UserId}", id, restoredBy);
+            const string message = "Đã khôi phục môn học.";
+            await NotifySubjectChangedSafelyAsync(
+                id,
+                "SubjectRestored",
+                message,
+                cancellationToken);
+
+            return new OperationResult(true, message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restore subject {Id}", id);
+            return new OperationResult(false, "Không thể khôi phục môn học.");
+        }
+    }
+
+    private async Task NotifySubjectChangedSafelyAsync(
+        int subjectId,
+        string action,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _subjectRealtimeNotifier.NotifySubjectChangedAsync(
+                subjectId,
+                action,
+                message,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not broadcast subject realtime event {Action} for subject {SubjectId}",
+                action,
+                subjectId);
+        }
+    }
+
+    private async Task NotifySubjectMembersChangedSafelyAsync(
+        int subjectId,
+        string action,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _subjectRealtimeNotifier.NotifySubjectMembersChangedAsync(
+                subjectId,
+                action,
+                message,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not broadcast subject members realtime event {Action} for subject {SubjectId}",
+                action,
+                subjectId);
         }
     }
 
@@ -500,6 +655,21 @@ public sealed class SubjectService : ISubjectService
 
     private static string NormalizeManagementFilter(string? filter, string? currentUserRole)
     {
+        if (string.Equals(currentUserRole, UserRoleNames.Admin, StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(filter, FilterDeleted, StringComparison.OrdinalIgnoreCase))
+            {
+                return FilterDeleted;
+            }
+
+            if (string.Equals(filter, FilterAll, StringComparison.OrdinalIgnoreCase))
+            {
+                return FilterAll;
+            }
+
+            return FilterActive;
+        }
+
         if (string.Equals(filter, FilterCreated, StringComparison.OrdinalIgnoreCase))
         {
             return FilterCreated;
@@ -510,14 +680,9 @@ public sealed class SubjectService : ISubjectService
             return FilterEnrolled;
         }
 
-        if (string.Equals(filter, FilterAll, StringComparison.OrdinalIgnoreCase))
-        {
-            return FilterAll;
-        }
-
         return string.Equals(currentUserRole, UserRoleNames.Teacher, StringComparison.OrdinalIgnoreCase)
             ? FilterEnrolled
-            : FilterAll;
+            : FilterActive;
     }
 
     private static bool IsTeacherParticipant(Subject subject, int userId)
@@ -588,6 +753,9 @@ public sealed class SubjectService : ISubjectService
             isTeacherEnrolled,
             isStudentEnrolled,
             canManage,
+            s.IsDeleted,
+            s.DeletedAt,
+            s.DeleteReason,
             teacherNames,
             memberNames);
     }

@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS dbo.EvaluationQuestions;
 DROP TABLE IF EXISTS dbo.Citations;
 DROP TABLE IF EXISTS dbo.ChatMessages;
 DROP TABLE IF EXISTS dbo.ChatSessions;
+DROP TABLE IF EXISTS dbo.Notifications;
 DROP TABLE IF EXISTS dbo.DocumentConflictFindings;
 DROP TABLE IF EXISTS dbo.DocumentConflictCandidates;
 DROP TABLE IF EXISTS dbo.DocumentConflictReviews;
@@ -72,12 +73,54 @@ BEGIN
         SubjectName     NVARCHAR(200) NOT NULL,
         Description     NVARCHAR(MAX) NULL,
         CreatedBy       INT NULL,
+        IsDeleted       BIT NOT NULL CONSTRAINT DF_Subjects_IsDeleted DEFAULT 0,
+        DeletedAt       DATETIME2(0) NULL,
+        DeletedBy       INT NULL,
+        DeleteReason    NVARCHAR(500) NULL,
         CreatedAt       DATETIME2(0) NOT NULL CONSTRAINT DF_Subjects_CreatedAt DEFAULT SYSUTCDATETIME(),
         UpdatedAt       DATETIME2(0) NULL,
 
         CONSTRAINT UQ_Subjects_SubjectCode UNIQUE (SubjectCode),
-        CONSTRAINT FK_Subjects_Users_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.Users(Id)
+        CONSTRAINT FK_Subjects_Users_CreatedBy FOREIGN KEY (CreatedBy) REFERENCES dbo.Users(Id),
+        CONSTRAINT FK_Subjects_DeletedBy FOREIGN KEY (DeletedBy) REFERENCES dbo.Users(Id)
     );
+END
+GO
+
+IF OBJECT_ID(N'dbo.Subjects', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.Subjects', N'IsDeleted') IS NULL
+BEGIN
+    ALTER TABLE dbo.Subjects
+    ADD IsDeleted BIT NOT NULL CONSTRAINT DF_Subjects_IsDeleted DEFAULT 0;
+END
+GO
+
+IF OBJECT_ID(N'dbo.Subjects', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.Subjects', N'DeletedAt') IS NULL
+BEGIN
+    ALTER TABLE dbo.Subjects ADD DeletedAt DATETIME2(0) NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.Subjects', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.Subjects', N'DeletedBy') IS NULL
+BEGIN
+    ALTER TABLE dbo.Subjects ADD DeletedBy INT NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.Subjects', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.Subjects', N'DeleteReason') IS NULL
+BEGIN
+    ALTER TABLE dbo.Subjects ADD DeleteReason NVARCHAR(500) NULL;
+END
+GO
+
+IF OBJECT_ID(N'dbo.FK_Subjects_DeletedBy', N'F') IS NULL
+    AND OBJECT_ID(N'dbo.Subjects', N'U') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.Subjects
+    ADD CONSTRAINT FK_Subjects_DeletedBy FOREIGN KEY (DeletedBy) REFERENCES dbo.Users(Id);
 END
 GO
 
@@ -308,6 +351,30 @@ END
 GO
 
 /* =========================================================
+   7.1. Notifications
+   In-app notifications for teachers and students.
+   ========================================================= */
+IF OBJECT_ID(N'dbo.Notifications', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Notifications
+    (
+        Id               INT IDENTITY(1,1) PRIMARY KEY,
+        UserId           INT NOT NULL,
+        Title            NVARCHAR(200) NOT NULL,
+        Message          NVARCHAR(1000) NOT NULL,
+        Type             NVARCHAR(50) NOT NULL,
+        RelatedSubjectId INT NULL,
+        IsRead           BIT NOT NULL CONSTRAINT DF_Notifications_IsRead DEFAULT 0,
+        CreatedAt        DATETIME2(0) NOT NULL CONSTRAINT DF_Notifications_CreatedAt DEFAULT SYSUTCDATETIME(),
+        ReadAt           DATETIME2(0) NULL,
+
+        CONSTRAINT FK_Notifications_Users FOREIGN KEY (UserId) REFERENCES dbo.Users(Id),
+        CONSTRAINT FK_Notifications_Subjects FOREIGN KEY (RelatedSubjectId) REFERENCES dbo.Subjects(Id)
+    );
+END
+GO
+
+/* =========================================================
    8. ChatMessages
    Stores user questions and assistant answers.
    ========================================================= */
@@ -426,6 +493,24 @@ CREATE INDEX IX_ChatSessions_UserId ON dbo.ChatSessions(UserId);
 CREATE INDEX IX_ChatSessions_SubjectId ON dbo.ChatSessions(SubjectId);
 CREATE INDEX IX_ChatMessages_ChatSessionId ON dbo.ChatMessages(ChatSessionId);
 CREATE INDEX IX_Citations_ChatMessageId ON dbo.Citations(ChatMessageId);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Subjects_IsDeleted' AND object_id = OBJECT_ID(N'dbo.Subjects'))
+BEGIN
+    CREATE INDEX IX_Subjects_IsDeleted ON dbo.Subjects(IsDeleted);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Notifications_User_Read_CreatedAt' AND object_id = OBJECT_ID(N'dbo.Notifications'))
+BEGIN
+    CREATE INDEX IX_Notifications_User_Read_CreatedAt ON dbo.Notifications(UserId, IsRead, CreatedAt DESC);
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_Notifications_RelatedSubjectId' AND object_id = OBJECT_ID(N'dbo.Notifications'))
+BEGIN
+    CREATE INDEX IX_Notifications_RelatedSubjectId ON dbo.Notifications(RelatedSubjectId);
+END
 GO
 
 /* =========================================================

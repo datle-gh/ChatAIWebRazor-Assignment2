@@ -87,5 +87,12 @@ public interface ISubjectService
     /// </summary>
     Task<OperationResult> DeleteSubjectAsync(
         int id,
+        int deletedBy,
+        string? reason,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationResult> RestoreSubjectAsync(
+        int id,
+        int restoredBy,
         CancellationToken cancellationToken = default);
 }

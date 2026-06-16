@@ -7,6 +7,9 @@
 
     bool IsActive(params string[] pagePrefixes) { return pagePrefixes.Any(prefix => currentPage.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)); }
 }
+@using System.Security.Claims
+@using BusinessLogic.Services.Interfaces
+@inject INotificationService NotificationService
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -116,6 +119,14 @@
                     </button>
                     <div class="topbar-title d-none d-sm-block">ChatAIWeb</div>
                 </div>
+                @{
+                    var notificationSummary = new BusinessLogic.DTOs.Responses.NotificationSummaryDto(0, []);
+                    var currentUserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    if (int.TryParse(currentUserIdClaim, out var currentUserId))
+                    {
+                        notificationSummary = await NotificationService.GetSummaryAsync(currentUserId);
+                    }
+                }
                 <div class="topbar-actions">
                     @if (canUploadDocuments)
                     {
@@ -123,6 +134,10 @@
                             <span class="material-symbols-outlined" aria-hidden="true">upload_file</span>
                         </a>
                     }
+                    <div class="notification-shell" data-notification-shell>
+                        @Html.AntiForgeryToken()
+                        @await Html.PartialAsync("/Pages/Shared/_NotificationDropdown.cshtml", notificationSummary)
+                    </div>
                     <a class="user-chip" asp-page="/Account/Profile">
                         <span class="avatar-dot" aria-hidden="true">@avatarLetter</span>
                         <span class="d-none d-md-inline">@displayName</span>
@@ -144,6 +159,90 @@
 
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @if (isAuthenticated)
+    {
+        <script src="~/lib/signalr/signalr.min.js"></script>
+        <script>
+            (() => {
+                const shell = document.querySelector('[data-notification-shell]');
+                if (!shell || !window.signalR) {
+                    return;
+                }
+
+                const summaryUrl = '/Notifications/Summary';
+                const markReadUrl = '/Notifications/Summary?handler=MarkRead';
+                const markAllUrl = '/Notifications/Summary?handler=MarkAllRead';
+
+                async function refreshNotifications() {
+                    const response = await fetch(summaryUrl, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    if (response.ok) {
+                        const token = shell.querySelector('input[name="__RequestVerificationToken"]')?.outerHTML ?? '';
+                        shell.innerHTML = token + await response.text();
+                    }
+                }
+
+                async function postNotification(url, formData) {
+                    await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'RequestVerificationToken': shell.querySelector('input[name="__RequestVerificationToken"]')?.value ?? ''
+                        },
+                        body: formData
+                    });
+                    await refreshNotifications();
+                }
+
+                shell.addEventListener('click', async (event) => {
+                    const toggle = event.target.closest('[data-notification-toggle]');
+                    const markAll = event.target.closest('[data-notification-mark-all]');
+                    const item = event.target.closest('[data-notification-id]');
+                    const menu = shell.querySelector('[data-notification-menu]');
+
+                    if (toggle) {
+                        menu?.classList.toggle('open');
+                        return;
+                    }
+
+                    if (markAll) {
+                        event.preventDefault();
+                        await postNotification(markAllUrl, new FormData());
+                        return;
+                    }
+
+                    if (item) {
+                        const formData = new FormData();
+                        formData.append('id', item.dataset.notificationId);
+                        await postNotification(markReadUrl, formData);
+                    }
+                });
+
+                document.addEventListener('click', (event) => {
+                    if (!shell.contains(event.target)) {
+                        shell.querySelector('[data-notification-menu]')?.classList.remove('open');
+                    }
+                });
+
+                const connection = new signalR.HubConnectionBuilder()
+                    .withUrl('/hubs/notifications')
+                    .withAutomaticReconnect()
+                    .build();
+
+                connection.on('NotificationReceived', refreshNotifications);
+                connection.onreconnected(async () => {
+                    try {
+                        await connection.invoke('JoinNotifications');
+                        await refreshNotifications();
+                    } catch {
+                    }
+                });
+                connection.start()
+                    .then(() => connection.invoke('JoinNotifications'))
+                    .catch(() => {});
+            })();
+        </script>
+    }
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

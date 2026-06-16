@@ -19,9 +19,19 @@ public partial class Subject
 
     public DateTime? UpdatedAt { get; set; }
 
+    public bool IsDeleted { get; set; }
+
+    public DateTime? DeletedAt { get; set; }
+
+    public int? DeletedBy { get; set; }
+
+    public string? DeleteReason { get; set; }
+
     public virtual ICollection<ChatSession> ChatSessions { get; set; } = new List<ChatSession>();
 
     public virtual User? CreatedByNavigation { get; set; }
+
+    public virtual User? DeletedByNavigation { get; set; }
 
     public virtual ICollection<DocumentConflictReview> DocumentConflictReviews { get; set; } = new List<DocumentConflictReview>();
 

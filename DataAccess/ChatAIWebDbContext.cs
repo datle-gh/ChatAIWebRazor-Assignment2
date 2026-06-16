@@ -33,6 +33,8 @@ public partial class ChatAIWebDbContext : DbContext
 
     public virtual DbSet<EvaluationQuestion> EvaluationQuestions { get; set; }
 
+    public virtual DbSet<Notification> Notifications { get; set; }
+
     public virtual DbSet<RagasBenchmarkResult> RagasBenchmarkResults { get; set; }
 
     public virtual DbSet<Subject> Subjects { get; set; }
@@ -291,6 +293,33 @@ public partial class ChatAIWebDbContext : DbContext
                 .HasConstraintName("FK_EvaluationQuestions_Subjects");
         });
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_Notifications");
+
+            entity.HasIndex(e => new { e.UserId, e.IsRead, e.CreatedAt }, "IX_Notifications_User_Read_CreatedAt");
+
+            entity.HasIndex(e => e.RelatedSubjectId, "IX_Notifications_RelatedSubjectId");
+
+            entity.Property(e => e.CreatedAt)
+                .HasPrecision(0)
+                .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.IsRead).HasDefaultValue(false);
+            entity.Property(e => e.Message).HasMaxLength(1000);
+            entity.Property(e => e.ReadAt).HasPrecision(0);
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.Property(e => e.Type).HasMaxLength(50);
+
+            entity.HasOne(d => d.User).WithMany(p => p.Notifications)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_Notifications_Users");
+
+            entity.HasOne(d => d.RelatedSubject).WithMany()
+                .HasForeignKey(d => d.RelatedSubjectId)
+                .HasConstraintName("FK_Notifications_Subjects");
+        });
+
         modelBuilder.Entity<RagasBenchmarkResult>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__RagasBen__3214EC0770165910");
@@ -320,16 +349,25 @@ public partial class ChatAIWebDbContext : DbContext
 
             entity.HasIndex(e => e.SubjectName, "IX_Subjects_SubjectName");
 
+            entity.HasIndex(e => e.IsDeleted, "IX_Subjects_IsDeleted");
+
             entity.HasIndex(e => e.SubjectCode, "UQ_Subjects_SubjectCode").IsUnique();
 
             entity.Property(e => e.CreatedAt)
                 .HasPrecision(0)
                 .HasDefaultValueSql("(sysutcdatetime())");
+            entity.Property(e => e.DeletedAt).HasPrecision(0);
+            entity.Property(e => e.DeleteReason).HasMaxLength(500);
+            entity.Property(e => e.IsDeleted).HasDefaultValue(false);
             entity.Property(e => e.SubjectCode).HasMaxLength(50);
             entity.Property(e => e.SubjectName).HasMaxLength(200);
             entity.Property(e => e.UpdatedAt).HasPrecision(0);
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Subjects).HasForeignKey(d => d.CreatedBy);
+
+            entity.HasOne(d => d.DeletedByNavigation).WithMany(p => p.DeletedSubjects)
+                .HasForeignKey(d => d.DeletedBy)
+                .HasConstraintName("FK_Subjects_DeletedBy");
         });
 
         modelBuilder.Entity<SubjectEnrollment>(entity =>

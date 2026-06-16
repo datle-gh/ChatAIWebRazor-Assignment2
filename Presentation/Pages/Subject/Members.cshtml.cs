@@ -2,6 +2,7 @@ using BusinessLogic.DTOs.Responses;
 using BusinessLogic.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Presentation.Models;
 
 namespace Presentation.Pages.Subject;
@@ -20,14 +21,38 @@ public sealed class MembersModel : AppPageModel
 
     public async Task<IActionResult> OnGetAsync(int id, CancellationToken cancellationToken)
     {
-        var members = await _subjectService.GetSubjectMembersAsync(id, cancellationToken);
-        if (members is null)
+        var viewModel = await LoadViewModelAsync(id, cancellationToken);
+        if (viewModel is null)
         {
             return NotFound("Không tìm thấy môn học.");
         }
 
-        ViewModel = MapMembers(members);
+        ViewModel = viewModel;
         return Page();
+    }
+
+    public async Task<IActionResult> OnGetMembersPartialAsync(int id, CancellationToken cancellationToken)
+    {
+        var viewModel = await LoadViewModelAsync(id, cancellationToken);
+        if (viewModel is null)
+        {
+            return NotFound("Không tìm thấy môn học.");
+        }
+
+        ViewModel = viewModel;
+        return new PartialViewResult
+        {
+            ViewName = "/Pages/Subject/_SubjectMembersPartial.cshtml",
+            ViewData = new ViewDataDictionary<SubjectMembersViewModel>(ViewData, ViewModel)
+        };
+    }
+
+    private async Task<SubjectMembersViewModel?> LoadViewModelAsync(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var members = await _subjectService.GetSubjectMembersAsync(id, cancellationToken);
+        return members is null ? null : MapMembers(members);
     }
 
     private static SubjectMembersViewModel MapMembers(SubjectMembersDto dto)

@@ -6,11 +6,15 @@ public interface ISubjectRepository
 {
     Task<IReadOnlyList<Subject>> GetAllAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Subject>> GetAllIncludingDeletedAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Subject>> GetUploadableByTeacherAsync(
         int teacherId,
         CancellationToken cancellationToken = default);
 
     Task<Subject?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<Subject?> GetByIdIncludingDeletedAsync(int id, CancellationToken cancellationToken = default);
 
     Task AddAsync(Subject subject, CancellationToken cancellationToken = default);
 
@@ -28,5 +32,11 @@ public interface ISubjectRepository
 
     Task UpdateAsync(Subject subject, CancellationToken cancellationToken = default);
 
-    Task DeleteAsync(Subject subject, CancellationToken cancellationToken = default);
+    Task SoftDeleteAsync(
+        Subject subject,
+        int deletedBy,
+        string? reason,
+        CancellationToken cancellationToken = default);
+
+    Task RestoreAsync(Subject subject, CancellationToken cancellationToken = default);
 }

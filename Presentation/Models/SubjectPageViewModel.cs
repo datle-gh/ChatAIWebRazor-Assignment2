@@ -7,6 +7,8 @@ public sealed class SubjectPageViewModel
     public IReadOnlyList<SubjectViewModel> Subjects { get; set; } = [];
 
     public bool IsAdmin { get; set; }
+
+    public string StatusFilter { get; set; } = "active";
 }
 
 public sealed class SubjectViewModel
@@ -24,6 +26,9 @@ public sealed class SubjectViewModel
     public string? CreatedByName { get; set; }
     public bool IsTeacherEnrolled { get; set; }
     public bool CanManage { get; set; }
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public string? DeleteReason { get; set; }
     public IReadOnlyList<string> TeacherNames { get; set; } = [];
     public IReadOnlyList<string> MemberNames { get; set; } = [];
 }

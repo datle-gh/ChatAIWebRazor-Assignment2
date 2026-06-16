@@ -83,7 +83,10 @@ builder.Services.AddScoped<PromptBuilder>();
 builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
 builder.Services.AddScoped<ITextExtractionService, TextExtractionService>();
 builder.Services.AddScoped<IUploadProgressReporter, SignalRUploadProgressReporter>();
+builder.Services.AddScoped<ISubjectRealtimeNotifier, SignalRSubjectRealtimeNotifier>();
+builder.Services.AddScoped<INotificationRealtimeNotifier, SignalRNotificationRealtimeNotifier>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 builder.Services.AddScoped<IRagasEvaluationService, RagasEvaluationService>();
 builder.Services.AddHttpClient<IRagasEvaluatorClient, RagasEvaluatorClient>();
@@ -102,6 +105,7 @@ builder.Services.AddScoped<IChatRepository, ChatRepository>();
 builder.Services.AddScoped<ICitationRepository, CitationRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IEvaluationQuestionRepository, EvaluationQuestionRepository>();
 builder.Services.AddScoped<IRagasBenchmarkResultRepository, RagasBenchmarkResultRepository>();
 
@@ -126,5 +130,7 @@ app.UseAuthorization();
 
 app.MapRazorPages();
 app.MapHub<UploadProgressHub>("/hubs/upload-progress");
+app.MapHub<SubjectManagementHub>("/hubs/subject-management");
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();

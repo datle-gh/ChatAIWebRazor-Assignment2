@@ -499,6 +499,7 @@
             @errorMsg
         </div>
     }
+    <div id="subject-members-inline-message"></div>
 
     <div id="subject-members-region"
          data-subject-id="@Model.ViewModel.SubjectId"
@@ -529,6 +530,19 @@
             const subjectId = Number.parseInt(region.dataset.subjectId || '0', 10);
             const refreshUrl = region.dataset.subjectMembersUrl;
             let refreshTimer;
+
+            function showMembersMessage(succeeded, message) {
+                const holder = document.getElementById('subject-members-inline-message');
+                if (!holder) {
+                    return;
+                }
+
+                holder.innerHTML = `
+                    <div class="${succeeded ? 'alert-success-banner' : 'alert-error-banner'}">
+                        <span class="material-symbols-outlined" style="font-size:1.1rem">${succeeded ? 'check_circle' : 'error'}</span>
+                        <span>${message}</span>
+                    </div>`;
+            }
 
             function showRealtimeError() {
                 if (document.querySelector('[data-subject-members-realtime-error]')) {
@@ -591,6 +605,31 @@
             connection.start()
                 .then(joinMembersGroup)
                 .catch(showRealtimeError);
+
+            region.addEventListener('submit', async (event) => {
+                const form = event.target.closest('form');
+                if (!form || !form.method || form.method.toLowerCase() !== 'post') {
+                    return;
+                }
+
+                event.preventDefault();
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        body: new FormData(form)
+                    });
+                    if (!response.ok) {
+                        throw new Error('Submit failed.');
+                    }
+
+                    const result = await response.json();
+                    showMembersMessage(Boolean(result.succeeded), result.message || '');
+                    await refreshMembers();
+                } catch {
+                    showRealtimeError();
+                }
+            });
         })();
     </script>
 }

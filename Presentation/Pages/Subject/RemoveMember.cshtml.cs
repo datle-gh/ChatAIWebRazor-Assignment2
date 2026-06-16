@@ -24,7 +24,20 @@ public sealed class RemoveMemberModel : AppPageModel
             enrollmentId,
             cancellationToken);
 
+        if (IsAjaxRequest())
+        {
+            return new JsonResult(new { succeeded = result.Succeeded, message = result.Message });
+        }
+
         TempData[result.Succeeded ? "SuccessMessage" : "ErrorMessage"] = result.Message;
         return RedirectToPage("/Subject/Members", new { id = subjectId });
+    }
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers["X-Requested-With"],
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
     }
 }

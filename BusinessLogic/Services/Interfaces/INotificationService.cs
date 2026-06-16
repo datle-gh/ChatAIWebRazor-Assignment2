@@ -19,7 +19,11 @@ public interface INotificationService
         int userId,
         CancellationToken cancellationToken = default);
 
-    Task NotifySubjectDeletedAsync(
-        Subject subject,
+    Task NotifyUsersAsync(
+        IReadOnlyCollection<int> recipientUserIds,
+        string title,
+        string message,
+        string type,
+        int? relatedSubjectId,
         CancellationToken cancellationToken = default);
 }

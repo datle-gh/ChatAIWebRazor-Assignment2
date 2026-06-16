@@ -18,30 +18,48 @@ public sealed class SignalRSubjectRealtimeNotifier : ISubjectRealtimeNotifier
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken = default)
     {
         var payload = CreatePayload(subjectId, action, message);
         await _hubContext.Clients
-            .Group(SubjectManagementGroups.Index)
+            .Group(SubjectManagementGroups.Admins)
             .SendAsync(action, payload, cancellationToken);
         await _hubContext.Clients
             .Group(SubjectManagementGroups.ForMembers(subjectId))
             .SendAsync(action, payload, cancellationToken);
+        await SendToUsersAsync(recipientUserIds, action, payload, cancellationToken);
     }
 
     public async Task NotifySubjectMembersChangedAsync(
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken = default)
     {
         var payload = CreatePayload(subjectId, action, message);
         await _hubContext.Clients
-            .Group(SubjectManagementGroups.Index)
+            .Group(SubjectManagementGroups.Admins)
             .SendAsync(action, payload, cancellationToken);
         await _hubContext.Clients
             .Group(SubjectManagementGroups.ForMembers(subjectId))
             .SendAsync(action, payload, cancellationToken);
+        await SendToUsersAsync(recipientUserIds, action, payload, cancellationToken);
+    }
+
+    private async Task SendToUsersAsync(
+        IReadOnlyCollection<int> recipientUserIds,
+        string action,
+        SubjectRealtimeEventDto payload,
+        CancellationToken cancellationToken)
+    {
+        foreach (var userId in recipientUserIds.Where(id => id > 0).Distinct())
+        {
+            await _hubContext.Clients
+                .Group(SubjectManagementGroups.ForUser(userId))
+                .SendAsync(action, payload, cancellationToken);
+        }
     }
 
     private static SubjectRealtimeEventDto CreatePayload(

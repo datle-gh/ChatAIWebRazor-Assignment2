@@ -6,11 +6,13 @@ public interface ISubjectRealtimeNotifier
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken = default);
 
     Task NotifySubjectMembersChangedAsync(
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken = default);
 }

@@ -9,8 +9,6 @@ namespace BusinessLogic.Services.Implementations;
 
 public sealed class NotificationService : INotificationService
 {
-    private const string SubjectDeletedType = "SubjectDeleted";
-
     private readonly INotificationRepository _notificationRepository;
     private readonly INotificationRealtimeNotifier _notificationRealtimeNotifier;
     private readonly ILogger<NotificationService> _logger;
@@ -52,16 +50,16 @@ public sealed class NotificationService : INotificationService
         await NotifyUserSafelyAsync(userId, cancellationToken);
     }
 
-    public async Task NotifySubjectDeletedAsync(
-        Subject subject,
+    public async Task NotifyUsersAsync(
+        IReadOnlyCollection<int> recipientUserIds,
+        string title,
+        string message,
+        string type,
+        int? relatedSubjectId,
         CancellationToken cancellationToken = default)
     {
-        var recipientIds = subject.SubjectEnrollments
-            .Where(enrollment => enrollment.User is { IsActive: true })
-            .Select(enrollment => enrollment.UserId)
-            .Concat(subject.CreatedBy.HasValue && subject.CreatedByNavigation?.IsActive == true
-                ? new[] { subject.CreatedBy.Value }
-                : [])
+        var recipientIds = recipientUserIds
+            .Where(userId => userId > 0)
             .Distinct()
             .ToList();
         if (recipientIds.Count == 0)
@@ -69,15 +67,13 @@ public sealed class NotificationService : INotificationService
             return;
         }
 
-        var title = "Môn học đã bị gỡ";
-        var message = $"Môn học {subject.SubjectCode} - {subject.SubjectName} đã bị gỡ khỏi hệ thống học tập.";
         var notifications = recipientIds.Select(userId => new Notification
         {
             UserId = userId,
             Title = title,
             Message = message,
-            Type = SubjectDeletedType,
-            RelatedSubjectId = subject.Id,
+            Type = type,
+            RelatedSubjectId = relatedSubjectId,
             IsRead = false,
             CreatedAt = DateTime.UtcNow
         }).ToList();

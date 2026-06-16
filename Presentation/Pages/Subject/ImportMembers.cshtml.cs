@@ -22,8 +22,7 @@ public sealed class ImportMembersModel : AppPageModel
     {
         if (file is null || file.Length == 0)
         {
-            TempData["ErrorMessage"] = "Vui lòng chọn file CSV/XLS/XLSX.";
-            return RedirectToPage("/Subject/Members", new { id = subjectId });
+            return CompleteRequest(false, "Vui lòng chọn file CSV/XLS/XLSX.", subjectId);
         }
 
         await using var stream = file.OpenReadStream();
@@ -31,7 +30,25 @@ public sealed class ImportMembersModel : AppPageModel
             new ImportSubjectMembersRequestDto(subjectId, stream, file.FileName),
             cancellationToken);
 
-        TempData[result.Succeeded ? "SuccessMessage" : "ErrorMessage"] = result.Message;
+        return CompleteRequest(result.Succeeded, result.Message, subjectId);
+    }
+
+    private IActionResult CompleteRequest(bool succeeded, string message, int subjectId)
+    {
+        if (IsAjaxRequest())
+        {
+            return new JsonResult(new { succeeded, message });
+        }
+
+        TempData[succeeded ? "SuccessMessage" : "ErrorMessage"] = message;
         return RedirectToPage("/Subject/Members", new { id = subjectId });
+    }
+
+    private bool IsAjaxRequest()
+    {
+        return string.Equals(
+            Request.Headers["X-Requested-With"],
+            "XMLHttpRequest",
+            StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -66,16 +66,19 @@
             <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
                 <div class="inline-flex rounded-xl border border-outline-variant/40 bg-white p-1" style="font-family:'Inter',sans-serif">
                     <a asp-page="/Subject/Index" asp-route-statusFilter="active"
+                       data-subject-filter="active"
                        class="px-3 py-2 rounded-lg text-sm font-semibold @(Model.ViewModel.StatusFilter == "active" ? "text-white" : "text-on-surface-variant")"
                        style="@(Model.ViewModel.StatusFilter == "active" ? "background:#4f46e5;text-decoration:none" : "text-decoration:none")">
                         Đang hoạt động
                     </a>
                     <a asp-page="/Subject/Index" asp-route-statusFilter="deleted"
+                       data-subject-filter="deleted"
                        class="px-3 py-2 rounded-lg text-sm font-semibold @(Model.ViewModel.StatusFilter == "deleted" ? "text-white" : "text-on-surface-variant")"
                        style="@(Model.ViewModel.StatusFilter == "deleted" ? "background:#4f46e5;text-decoration:none" : "text-decoration:none")">
                         Đã xóa
                     </a>
                     <a asp-page="/Subject/Index" asp-route-statusFilter="all"
+                       data-subject-filter="all"
                        class="px-3 py-2 rounded-lg text-sm font-semibold @(Model.ViewModel.StatusFilter == "all" ? "text-white" : "text-on-surface-variant")"
                        style="@(Model.ViewModel.StatusFilter == "all" ? "background:#4f46e5;text-decoration:none" : "text-decoration:none")">
                         Tất cả
@@ -107,9 +110,12 @@
             @errorMsg
         </div>
     }
+    <div id="subject-inline-message"></div>
 
     <div id="subject-list-region"
-         data-subject-list-url="@Url.Page("/Subject/Index", "ListPartial", new { statusFilter = Model.ViewModel.StatusFilter })">
+         data-subject-list-base-url="@Url.Page("/Subject/Index", "ListPartial")"
+         data-subject-list-url="@Url.Page("/Subject/Index", "ListPartial", new { statusFilter = Model.ViewModel.StatusFilter })"
+         data-status-filter="@Model.ViewModel.StatusFilter">
         @await Html.PartialAsync("_SubjectListPartial", Model.ViewModel)
     </div>
 
@@ -121,7 +127,7 @@
                 <p class="text-sm text-on-surface-variant mb-4" style="font-family:'Inter',sans-serif">
                     Môn học sẽ bị ẩn khỏi luồng học tập. Giảng viên và sinh viên liên quan sẽ nhận thông báo.
                 </p>
-                <form method="post" action="@Url.Page("/Subject/Delete")">
+                <form method="post" action="@Url.Page("/Subject/Delete")" data-subject-delete-form>
                     @Html.AntiForgeryToken()
                     <input type="hidden" name="id" id="soft-delete-subject-id" />
                     <input type="hidden" name="statusFilter" value="@Model.ViewModel.StatusFilter" />
@@ -156,8 +162,40 @@
                 return;
             }
 
-            const refreshUrl = region.dataset.subjectListUrl;
+            const baseRefreshUrl = region.dataset.subjectListBaseUrl;
+            let currentStatusFilter = region.dataset.statusFilter || 'active';
+            let refreshUrl = region.dataset.subjectListUrl;
             let refreshTimer;
+
+            function buildListUrl(statusFilter) {
+                const url = new URL(baseRefreshUrl, window.location.origin);
+                url.searchParams.set('statusFilter', statusFilter);
+                return url.toString();
+            }
+
+            function showInlineMessage(succeeded, message) {
+                const holder = document.getElementById('subject-inline-message');
+                if (!holder) {
+                    return;
+                }
+
+                holder.innerHTML = `
+                    <div class="flex items-center gap-3 px-5 py-3 rounded-xl border text-sm"
+                         style="${succeeded ? 'background:#e2dfff;border-color:#c3c0ff;color:#3525cd' : 'background:#ffdad6;border-color:#ffb4ab;color:#ba1a1a'};font-family:Inter,sans-serif">
+                        <span class="material-symbols-outlined text-[18px]">${succeeded ? 'check_circle' : 'error'}</span>
+                        <span>${message}</span>
+                    </div>`;
+            }
+
+            function updateFilterButtons() {
+                document.querySelectorAll('[data-subject-filter]').forEach(link => {
+                    const isActive = link.dataset.subjectFilter === currentStatusFilter;
+                    link.classList.toggle('text-white', isActive);
+                    link.classList.toggle('text-on-surface-variant', !isActive);
+                    link.style.background = isActive ? '#4f46e5' : '';
+                    link.style.textDecoration = 'none';
+                });
+            }
 
             function showRealtimeError() {
                 if (document.querySelector('[data-subject-realtime-error]')) {
@@ -182,6 +220,8 @@
                     }
 
                     region.innerHTML = await response.text();
+                    region.dataset.subjectListUrl = refreshUrl;
+                    region.dataset.statusFilter = currentStatusFilter;
                 } catch {
                     showRealtimeError();
                 }
@@ -224,6 +264,19 @@
                 .then(joinIndexGroup)
                 .catch(showRealtimeError);
 
+            document.querySelectorAll('[data-subject-filter]').forEach(link => {
+                link.addEventListener('click', async (event) => {
+                    event.preventDefault();
+                    currentStatusFilter = link.dataset.subjectFilter || 'active';
+                    refreshUrl = buildListUrl(currentStatusFilter);
+                    const pageUrl = new URL(window.location.href);
+                    pageUrl.searchParams.set('statusFilter', currentStatusFilter);
+                    window.history.pushState({}, '', pageUrl);
+                    updateFilterButtons();
+                    await refreshSubjects();
+                });
+            });
+
             const modal = document.getElementById('soft-delete-modal');
             const subjectInput = document.getElementById('soft-delete-subject-id');
             const reasonInput = document.getElementById('soft-delete-reason');
@@ -247,6 +300,45 @@
             modal?.addEventListener('click', closeDeleteModal);
             document.querySelectorAll('[data-soft-delete-close]').forEach(button => {
                 button.addEventListener('click', closeDeleteModal);
+            });
+
+            async function postSubjectForm(form) {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new FormData(form)
+                });
+                if (!response.ok) {
+                    throw new Error('Submit failed.');
+                }
+
+                const result = await response.json();
+                showInlineMessage(Boolean(result.succeeded), result.message || '');
+                closeDeleteModal();
+                await refreshSubjects();
+            }
+
+            document.querySelector('[data-subject-delete-form]')?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                try {
+                    await postSubjectForm(event.currentTarget);
+                } catch {
+                    showRealtimeError();
+                }
+            });
+
+            region.addEventListener('submit', async (event) => {
+                const form = event.target.closest('form[action*="/Subject/Restore"]');
+                if (!form) {
+                    return;
+                }
+
+                event.preventDefault();
+                try {
+                    await postSubjectForm(form);
+                } catch {
+                    showRealtimeError();
+                }
             });
         })();
     </script>

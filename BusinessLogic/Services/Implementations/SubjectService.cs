@@ -297,10 +297,22 @@ public sealed class SubjectService : ISubjectService
             cancellationToken);
 
         const string message = "Đã cập nhật thành viên môn học.";
+        var recipients = await ResolveSubjectRecipientIdsAsync(
+            request.SubjectId,
+            cancellationToken,
+            request.UserId);
+        await NotifyUsersSafelyAsync(
+            recipients,
+            "Thành viên môn học đã thay đổi",
+            message,
+            "SubjectMemberAdded",
+            request.SubjectId,
+            cancellationToken);
         await NotifySubjectMembersChangedSafelyAsync(
             request.SubjectId,
             "SubjectMemberAdded",
             message,
+            recipients,
             cancellationToken);
 
         return new OperationResult(true, message);
@@ -329,12 +341,25 @@ public sealed class SubjectService : ISubjectService
             return new OperationResult(false, "Không thể xóa trưởng bộ môn. Hãy đổi trưởng bộ môn trước.");
         }
 
+        var recipients = await ResolveSubjectRecipientIdsAsync(
+            subjectId,
+            cancellationToken,
+            enrollment.UserId);
+
         await _subjectRepository.DeleteEnrollmentAsync(enrollmentId, cancellationToken);
         const string message = "Đã xóa thành viên khỏi môn học.";
+        await NotifyUsersSafelyAsync(
+            recipients,
+            "Thành viên môn học đã thay đổi",
+            message,
+            "SubjectMemberRemoved",
+            subjectId,
+            cancellationToken);
         await NotifySubjectMembersChangedSafelyAsync(
             subjectId,
             "SubjectMemberRemoved",
             message,
+            recipients,
             cancellationToken);
 
         return new OperationResult(true, message);
@@ -378,10 +403,19 @@ public sealed class SubjectService : ISubjectService
             : "Không có dòng nào được import. Kiểm tra email và role trong file.";
         if (imported > 0)
         {
+            var recipients = await ResolveSubjectRecipientIdsAsync(request.SubjectId, cancellationToken);
+            await NotifyUsersSafelyAsync(
+                recipients,
+                "Danh sách lớp đã thay đổi",
+                message,
+                "SubjectMembersImported",
+                request.SubjectId,
+                cancellationToken);
             await NotifySubjectMembersChangedSafelyAsync(
                 request.SubjectId,
                 "SubjectMembersImported",
                 message,
+                recipients,
                 cancellationToken);
         }
 
@@ -422,10 +456,19 @@ public sealed class SubjectService : ISubjectService
 
             _logger.LogInformation("Created subject {Code} by user {UserId}", subject.SubjectCode, request.CreatedBy);
             const string message = "Tạo môn học thành công.";
+            var recipients = await ResolveSubjectRecipientIdsAsync(subject.Id, cancellationToken);
+            await NotifyUsersSafelyAsync(
+                recipients,
+                "Môn học mới",
+                $"Môn học {subject.SubjectCode} - {subject.SubjectName} đã được tạo.",
+                "SubjectCreated",
+                subject.Id,
+                cancellationToken);
             await NotifySubjectChangedSafelyAsync(
                 subject.Id,
                 "SubjectCreated",
                 message,
+                recipients,
                 cancellationToken);
 
             return new OperationResult(true, message);
@@ -474,10 +517,19 @@ public sealed class SubjectService : ISubjectService
 
             _logger.LogInformation("Updated subject {Id}", subject.Id);
             const string message = "Cập nhật môn học thành công.";
+            var recipients = await ResolveSubjectRecipientIdsAsync(subject.Id, cancellationToken);
+            await NotifyUsersSafelyAsync(
+                recipients,
+                "Môn học đã cập nhật",
+                $"Môn học {subject.SubjectCode} - {subject.SubjectName} đã được cập nhật.",
+                "SubjectUpdated",
+                subject.Id,
+                cancellationToken);
             await NotifySubjectChangedSafelyAsync(
                 subject.Id,
                 "SubjectUpdated",
                 message,
+                recipients,
                 cancellationToken);
 
             return new OperationResult(true, message);
@@ -508,15 +560,23 @@ public sealed class SubjectService : ISubjectService
 
         try
         {
+            var recipients = await ResolveSubjectRecipientIdsAsync(id, cancellationToken);
             await _subjectRepository.SoftDeleteAsync(subject, deletedBy, reason, cancellationToken);
-            await _notificationService.NotifySubjectDeletedAsync(subject, cancellationToken);
 
             _logger.LogInformation("Soft deleted subject {Id} by user {UserId}", id, deletedBy);
             const string message = "Đã xóa mềm môn học.";
+            await NotifyUsersSafelyAsync(
+                recipients,
+                "Môn học đã bị gỡ",
+                $"Môn học {subject.SubjectCode} - {subject.SubjectName} đã bị gỡ khỏi hệ thống học tập.",
+                "SubjectDeleted",
+                id,
+                cancellationToken);
             await NotifySubjectChangedSafelyAsync(
                 id,
                 "SubjectDeleted",
                 message,
+                recipients,
                 cancellationToken);
 
             return new OperationResult(true, message);
@@ -549,10 +609,19 @@ public sealed class SubjectService : ISubjectService
             await _subjectRepository.RestoreAsync(subject, cancellationToken);
             _logger.LogInformation("Restored subject {Id} by user {UserId}", id, restoredBy);
             const string message = "Đã khôi phục môn học.";
+            var recipients = await ResolveSubjectRecipientIdsAsync(id, cancellationToken);
+            await NotifyUsersSafelyAsync(
+                recipients,
+                "Môn học đã khôi phục",
+                $"Môn học {subject.SubjectCode} - {subject.SubjectName} đã được khôi phục.",
+                "SubjectRestored",
+                id,
+                cancellationToken);
             await NotifySubjectChangedSafelyAsync(
                 id,
                 "SubjectRestored",
                 message,
+                recipients,
                 cancellationToken);
 
             return new OperationResult(true, message);
@@ -568,6 +637,7 @@ public sealed class SubjectService : ISubjectService
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken)
     {
         try
@@ -576,6 +646,7 @@ public sealed class SubjectService : ISubjectService
                 subjectId,
                 action,
                 message,
+                recipientUserIds,
                 cancellationToken);
         }
         catch (Exception exception)
@@ -592,6 +663,7 @@ public sealed class SubjectService : ISubjectService
         int subjectId,
         string action,
         string message,
+        IReadOnlyCollection<int> recipientUserIds,
         CancellationToken cancellationToken)
     {
         try
@@ -600,6 +672,7 @@ public sealed class SubjectService : ISubjectService
                 subjectId,
                 action,
                 message,
+                recipientUserIds,
                 cancellationToken);
         }
         catch (Exception exception)
@@ -609,6 +682,73 @@ public sealed class SubjectService : ISubjectService
                 "Could not broadcast subject members realtime event {Action} for subject {SubjectId}",
                 action,
                 subjectId);
+        }
+    }
+
+    private async Task<IReadOnlyCollection<int>> ResolveSubjectRecipientIdsAsync(
+        int subjectId,
+        CancellationToken cancellationToken,
+        params int[] extraUserIds)
+    {
+        var subject = await _subjectRepository.GetByIdIncludingDeletedAsync(subjectId, cancellationToken);
+        var adminIds = await GetActiveAdminIdsAsync(cancellationToken);
+        if (subject is null)
+        {
+            return adminIds
+                .Concat(extraUserIds)
+                .Where(userId => userId > 0)
+                .Distinct()
+                .ToList();
+        }
+
+        return adminIds
+            .Concat(subject.SubjectEnrollments
+                .Where(enrollment => enrollment.User is { IsActive: true })
+                .Select(enrollment => enrollment.UserId))
+            .Concat(subject.CreatedBy.HasValue && subject.CreatedByNavigation?.IsActive == true
+                ? new[] { subject.CreatedBy.Value }
+                : [])
+            .Concat(extraUserIds)
+            .Where(userId => userId > 0)
+            .Distinct()
+            .ToList();
+    }
+
+    private async Task<IReadOnlyCollection<int>> GetActiveAdminIdsAsync(CancellationToken cancellationToken)
+    {
+        var users = await _userRepository.GetAllAsync(cancellationToken);
+        return users
+            .Where(user => user.IsActive
+                && string.Equals(user.Role, UserRoleNames.Admin, StringComparison.OrdinalIgnoreCase))
+            .Select(user => user.Id)
+            .ToList();
+    }
+
+    private async Task NotifyUsersSafelyAsync(
+        IReadOnlyCollection<int> recipientUserIds,
+        string title,
+        string message,
+        string type,
+        int? relatedSubjectId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _notificationService.NotifyUsersAsync(
+                recipientUserIds,
+                title,
+                message,
+                type,
+                relatedSubjectId,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Could not create subject notification {Type} for subject {SubjectId}",
+                type,
+                relatedSubjectId);
         }
     }
 

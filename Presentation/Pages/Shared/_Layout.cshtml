@@ -1,4 +1,4 @@
-﻿@{
+@{
     var currentPage = ViewContext.RouteData.Values["page"]?.ToString() ?? string.Empty;
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
     var displayName = User.Identity?.Name ?? "User";
@@ -37,7 +37,7 @@
                     <a class="brand-title" asp-page="/Chat/Index">Insightful AI</a>
                     <div class="brand-subtitle">Hệ thống học tập thông minh</div>
                 </div>
-                @* Desktop collapse/expand button — inside brand-block for correct flow layout *@
+                @* Desktop collapse/expand button inside brand-block for correct flow layout *@
                 <button class="sidebar-collapse-btn"
                         type="button"
                         data-sidebar-collapse
@@ -71,7 +71,7 @@
                 {
                     <a class="shell-nav-link @(IsActive("/Subject") ? "active" : "")" asp-page="/Subject/Index">
                         <span class="material-symbols-outlined shell-nav-icon @(IsActive("/Subject") ? "icon-fill" : "")" aria-hidden="true">menu_book</span>
-                        <span>Quản lý môn học</span>
+                        <span>@(User.IsInRole("Admin") ? "Quản lý môn học" : "Danh sách môn học")</span>
                     </a>
                 }
                 @if (User.IsInRole("Admin"))

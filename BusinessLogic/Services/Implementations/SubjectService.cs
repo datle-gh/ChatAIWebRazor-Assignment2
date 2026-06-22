@@ -555,7 +555,7 @@ public sealed class SubjectService : ISubjectService
 
         if (subject.IsDeleted)
         {
-            return new OperationResult(true, "Môn học đã được xóa mềm trước đó.");
+            return new OperationResult(true, "Môn học đã được xóa trước đó.");
         }
 
         try
@@ -564,7 +564,7 @@ public sealed class SubjectService : ISubjectService
             await _subjectRepository.SoftDeleteAsync(subject, deletedBy, reason, cancellationToken);
 
             _logger.LogInformation("Soft deleted subject {Id} by user {UserId}", id, deletedBy);
-            const string message = "Đã xóa mềm môn học.";
+            const string message = "Đã xóa môn học.";
             await NotifyUsersSafelyAsync(
                 recipients,
                 "Môn học đã bị gỡ",
@@ -584,7 +584,7 @@ public sealed class SubjectService : ISubjectService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to soft delete subject {Id}", id);
-            return new OperationResult(false, "Không thể xóa mềm môn học.");
+            return new OperationResult(false, "Không thể xóa môn học.");
         }
     }
 

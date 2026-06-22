@@ -1,4 +1,4 @@
-﻿@page "/Subject/Index"
+@page "/Subject/Index"
 @model Presentation.Pages.Subject.IndexModel
 
 @{
@@ -123,7 +123,7 @@
     {
         <div id="soft-delete-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background:rgba(15,23,42,0.42)">
             <div class="bg-white rounded-2xl shadow-xl border border-outline-variant/40 w-full max-w-lg p-6" onclick="event.stopPropagation()">
-                <h2 class="text-xl font-bold text-on-surface mb-1" style="font-family:'Be Vietnam Pro',sans-serif">Xóa mềm môn học</h2>
+                <h2 class="text-xl font-bold text-on-surface mb-1" style="font-family:'Be Vietnam Pro',sans-serif">Xóa môn học</h2>
                 <p class="text-sm text-on-surface-variant mb-4" style="font-family:'Inter',sans-serif">
                     Môn học sẽ bị ẩn khỏi luồng học tập. Giảng viên và sinh viên liên quan sẽ nhận thông báo.
                 </p>
@@ -135,7 +135,7 @@
                     <textarea id="soft-delete-reason" name="reason" rows="4" maxlength="500"
                               class="w-full rounded-xl border border-outline-variant/60 px-3 py-2 text-sm"
                               style="font-family:'Inter',sans-serif"
-                              placeholder="Nhập lý do xóa mềm để lưu audit nội bộ."></textarea>
+                              placeholder="Nhập lý do xóa để lưu audit nội bộ."></textarea>
                     <div class="mt-5 flex justify-end gap-3">
                         <button type="button" class="px-4 py-2 rounded-xl border border-outline-variant/60 text-on-surface-variant font-semibold"
                                 style="font-family:'Inter',sans-serif"
@@ -144,7 +144,7 @@
                         </button>
                         <button type="submit" class="px-4 py-2 rounded-xl text-white font-semibold"
                                 style="background:#ba1a1a;font-family:'Inter',sans-serif">
-                            Xóa mềm
+                            Xóa
                         </button>
                     </div>
                 </form>

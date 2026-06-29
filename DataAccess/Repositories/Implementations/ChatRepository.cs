@@ -1,4 +1,5 @@
 using BusinessObject.Entities;
+using BusinessObject.Enums;
 using DataAccess.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -99,5 +100,21 @@ public sealed class ChatRepository : IChatRepository
         return _context.ChatMessages
             .AsNoTracking()
             .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ChatMessage>> GetAssistantMessagesByDateRangeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default)
+    {
+        return await _context.ChatMessages
+            .AsNoTracking()
+            .Where(message =>
+                message.Role == ChatRole.Assistant
+                && message.CreatedAt >= fromUtc
+                && message.CreatedAt < toUtc
+                && !string.IsNullOrWhiteSpace(message.ModelName))
+            .OrderBy(message => message.CreatedAt)
+            .ToListAsync(cancellationToken);
     }
 }

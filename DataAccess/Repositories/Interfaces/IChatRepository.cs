@@ -26,4 +26,9 @@ public interface IChatRepository
     Task<int> CountSessionsAsync(CancellationToken cancellationToken = default);
 
     Task<int> CountMessagesAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ChatMessage>> GetAssistantMessagesByDateRangeAsync(
+        DateTime fromUtc,
+        DateTime toUtc,
+        CancellationToken cancellationToken = default);
 }

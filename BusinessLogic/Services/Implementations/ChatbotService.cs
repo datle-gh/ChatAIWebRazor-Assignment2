@@ -91,11 +91,15 @@ public sealed class ChatbotService : IChatbotService
                 .Take(_ragSettings.MaxContextChunks)
                 .ToList();
 
-            var answer = relevantChunks.Count == 0
-                ? NotFoundAnswer
-                : await _llmService.GenerateAnswerAsync(
+            LlmResponse? llmResponse = null;
+            var answer = NotFoundAnswer;
+            if (relevantChunks.Count > 0)
+            {
+                llmResponse = await _llmService.GenerateAnswerWithUsageAsync(
                     _promptBuilder.Build(request.Question, relevantChunks),
                     cancellationToken);
+                answer = llmResponse.Answer;
+            }
 
             var assistantMessage = await _chatRepository.AddMessageAsync(
                 new ChatMessage
@@ -104,6 +108,8 @@ public sealed class ChatbotService : IChatbotService
                     Role = ChatRole.Assistant,
                     Content = answer,
                     ModelName = _llmService.ModelName,
+                    PromptTokens = llmResponse?.PromptTokens,
+                    CompletionTokens = llmResponse?.CompletionTokens,
                     CreatedAt = DateTime.UtcNow
                 },
                 cancellationToken);

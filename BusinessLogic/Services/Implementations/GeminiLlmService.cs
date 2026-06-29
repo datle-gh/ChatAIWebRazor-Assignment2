@@ -37,6 +37,14 @@ public sealed class GeminiLlmService : ILlmService
         string prompt,
         CancellationToken cancellationToken = default)
     {
+        var response = await GenerateAnswerWithUsageAsync(prompt, cancellationToken);
+        return response.Answer;
+    }
+
+    public async Task<LlmResponse> GenerateAnswerWithUsageAsync(
+        string prompt,
+        CancellationToken cancellationToken = default)
+    {
         if (string.IsNullOrWhiteSpace(prompt))
         {
             throw new InvalidOperationException("Prompt không được để trống.");
@@ -75,7 +83,19 @@ public sealed class GeminiLlmService : ILlmService
                 throw new InvalidOperationException("Mô hình AI không trả về nội dung.");
             }
 
-            return answer.Trim();
+            var usage = payload?.UsageMetadata;
+            var promptTokens = usage?.PromptTokenCount;
+            var completionTokens = usage?.CandidatesTokenCount;
+            var totalTokens = usage?.TotalTokenCount
+                ?? (promptTokens.HasValue || completionTokens.HasValue
+                    ? (promptTokens ?? 0) + (completionTokens ?? 0)
+                    : null);
+
+            return new LlmResponse(
+                answer.Trim(),
+                promptTokens,
+                completionTokens,
+                totalTokens);
         }
         catch (HttpRequestException exception)
         {
@@ -146,8 +166,14 @@ public sealed class GeminiLlmService : ILlmService
         [property: JsonPropertyName("maxOutputTokens")] int MaxOutputTokens);
 
     private sealed record GeminiGenerateContentResponse(
-        [property: JsonPropertyName("candidates")] IReadOnlyList<GeminiCandidate>? Candidates);
+        [property: JsonPropertyName("candidates")] IReadOnlyList<GeminiCandidate>? Candidates,
+        [property: JsonPropertyName("usageMetadata")] GeminiUsageMetadata? UsageMetadata);
 
     private sealed record GeminiCandidate(
         [property: JsonPropertyName("content")] GeminiContent? Content);
+
+    private sealed record GeminiUsageMetadata(
+        [property: JsonPropertyName("promptTokenCount")] int? PromptTokenCount,
+        [property: JsonPropertyName("candidatesTokenCount")] int? CandidatesTokenCount,
+        [property: JsonPropertyName("totalTokenCount")] int? TotalTokenCount);
 }

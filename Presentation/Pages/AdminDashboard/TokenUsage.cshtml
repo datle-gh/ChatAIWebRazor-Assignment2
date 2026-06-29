@@ -1,0 +1,298 @@
+@page "/AdminDashboard/TokenUsage"
+@model Presentation.Pages.AdminDashboard.TokenUsageModel
+
+@{
+    ViewData["Title"] = "Thống kê token";
+    var dailyLabels = Model.ViewModel.DailyUsage
+        .Select(item => item.Date)
+        .Distinct()
+        .OrderBy(date => date)
+        .Select(date => date.ToString("dd/MM"))
+        .ToList();
+    var dailyTotals = dailyLabels
+        .Select(label => Model.ViewModel.DailyUsage
+            .Where(item => item.Date.ToString("dd/MM") == label)
+            .Sum(item => item.TotalTokens))
+        .ToList();
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-1">Thống kê token theo mô hình</h1>
+            <p class="text-muted mb-0">
+                Dữ liệu 7 ngày gần nhất, từ @Model.ViewModel.FromUtc.ToLocalTime().ToString("dd/MM/yyyy")
+                đến @Model.ViewModel.ToUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm").
+            </p>
+        </div>
+        <a class="btn btn-outline-primary d-inline-flex align-items-center gap-2" asp-page="/AdminDashboard/Index">
+            <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>
+            Dashboard quản trị
+        </a>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-xl-3">
+            <div class="usage-card">
+                <span class="material-symbols-outlined usage-icon">forum</span>
+                <div>
+                    <div class="usage-label">Lượt hỏi AI</div>
+                    <div class="usage-value">@Model.ViewModel.RequestCount.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="usage-card">
+                <span class="material-symbols-outlined usage-icon">input</span>
+                <div>
+                    <div class="usage-label">Input tokens</div>
+                    <div class="usage-value">@Model.ViewModel.PromptTokens.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="usage-card">
+                <span class="material-symbols-outlined usage-icon">output</span>
+                <div>
+                    <div class="usage-label">Output tokens</div>
+                    <div class="usage-value">@Model.ViewModel.CompletionTokens.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="usage-card">
+                <span class="material-symbols-outlined usage-icon">data_usage</span>
+                <div>
+                    <div class="usage-label">TB token/câu</div>
+                    <div class="usage-value">@Model.ViewModel.AverageTokensPerRequest.ToString("N2")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-7">
+            <section class="usage-panel">
+                <div class="usage-panel-header">
+                    <div>
+                        <h2 class="h5 fw-bold mb-1">Token theo ngày</h2>
+                        <p class="text-muted small mb-0">Tổng input + output token của từng ngày.</p>
+                    </div>
+                </div>
+                <div class="usage-chart" aria-label="Biểu đồ token theo ngày">
+                    @if (dailyTotals.Count > 0 && dailyTotals.Max() > 0)
+                    {
+                        var maxTokens = dailyTotals.Max();
+                        for (var index = 0; index < dailyLabels.Count; index++)
+                        {
+                            var height = Math.Max(8, (int)Math.Round(dailyTotals[index] / (double)maxTokens * 180));
+                            <div class="usage-chart-column">
+                                <div class="usage-chart-value">@dailyTotals[index].ToString("N0")</div>
+                                <div class="usage-chart-bar" style="height:@(height)px"></div>
+                                <div class="usage-chart-label">@dailyLabels[index]</div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state">Chưa có dữ liệu token trong 7 ngày gần nhất.</div>
+                    }
+                </div>
+            </section>
+        </div>
+
+        <div class="col-xl-5">
+            <section class="usage-panel">
+                <div class="usage-panel-header">
+                    <div>
+                        <h2 class="h5 fw-bold mb-1">Tổng quan theo model</h2>
+                        <p class="text-muted small mb-0">So sánh mức sử dụng giữa các mô hình LLM.</p>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th class="text-end">Lượt</th>
+                                <th class="text-end">Input</th>
+                                <th class="text-end">Output</th>
+                                <th class="text-end">Tổng</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.ViewModel.Models.Any())
+                            {
+                                foreach (var item in Model.ViewModel.Models)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@item.ModelName</div>
+                                            <div class="small text-muted">TB @item.AverageTokensPerRequest.ToString("N2") token/câu</div>
+                                        </td>
+                                        <td class="text-end">@item.RequestCount.ToString("N0")</td>
+                                        <td class="text-end">@item.PromptTokens.ToString("N0")</td>
+                                        <td class="text-end">@item.CompletionTokens.ToString("N0")</td>
+                                        <td class="text-end fw-semibold">@item.TotalTokens.ToString("N0")</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Chưa có câu trả lời nào ghi nhận token.
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <section class="usage-panel mt-4">
+        <div class="usage-panel-header">
+            <div>
+                <h2 class="h5 fw-bold mb-1">Chi tiết theo ngày và model</h2>
+                <p class="text-muted small mb-0">Dùng phần này để đưa vào báo cáo so sánh model trong 1 tuần.</p>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Ngày</th>
+                        <th>Model</th>
+                        <th class="text-end">Lượt hỏi</th>
+                        <th class="text-end">Input token</th>
+                        <th class="text-end">Output token</th>
+                        <th class="text-end">Tổng token</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.ViewModel.DailyUsage.Any())
+                    {
+                        foreach (var item in Model.ViewModel.DailyUsage)
+                        {
+                            <tr>
+                                <td>@item.Date.ToString("dd/MM/yyyy")</td>
+                                <td>@item.ModelName</td>
+                                <td class="text-end">@item.RequestCount.ToString("N0")</td>
+                                <td class="text-end">@item.PromptTokens.ToString("N0")</td>
+                                <td class="text-end">@item.CompletionTokens.ToString("N0")</td>
+                                <td class="text-end fw-semibold">@item.TotalTokens.ToString("N0")</td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                Chưa có dữ liệu.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<style>
+    .usage-card,
+    .usage-panel {
+        background: var(--surface-lowest);
+        border: 1px solid rgba(199, 196, 216, 0.55);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-indigo);
+    }
+
+    .usage-card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-height: 112px;
+        padding: 20px;
+    }
+
+    .usage-icon {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        color: var(--primary-container);
+        background: rgba(79, 70, 229, 0.1);
+        border-radius: var(--radius-sm);
+        flex: 0 0 auto;
+    }
+
+    .usage-label {
+        color: var(--on-surface-variant);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .usage-value {
+        color: var(--on-surface);
+        font-family: "Be Vietnam Pro", sans-serif;
+        font-size: 1.65rem;
+        font-weight: 800;
+    }
+
+    .usage-panel {
+        overflow: hidden;
+    }
+
+    .usage-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 20px;
+        border-bottom: 1px solid rgba(199, 196, 216, 0.45);
+    }
+
+    .usage-chart {
+        display: flex;
+        align-items: end;
+        gap: 14px;
+        min-height: 280px;
+        padding: 28px 22px 20px;
+        overflow-x: auto;
+    }
+
+    .usage-chart-column {
+        display: grid;
+        grid-template-rows: 24px 190px 24px;
+        align-items: end;
+        justify-items: center;
+        min-width: 58px;
+        gap: 8px;
+    }
+
+    .usage-chart-value,
+    .usage-chart-label {
+        color: var(--on-surface-variant);
+        font-size: 0.75rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .usage-chart-bar {
+        width: 32px;
+        background: linear-gradient(180deg, #4f46e5 0%, #0891b2 100%);
+        border-radius: 8px 8px 3px 3px;
+    }
+
+    .empty-state {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        min-height: 220px;
+        color: var(--on-surface-variant);
+        text-align: center;
+    }
+</style>

@@ -77,9 +77,13 @@
                 @if (User.IsInRole("Admin"))
                 {
                     <div class="sidebar-section-label mt-3 mb-2 px-3 text-muted" style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Hệ thống</div>
-                    <a class="shell-nav-link @(IsActive("/AdminDashboard") ? "active" : "")" asp-page="/AdminDashboard/Index">
-                        <span class="material-symbols-outlined shell-nav-icon @(IsActive("/AdminDashboard") ? "icon-fill" : "")" aria-hidden="true">insert_chart</span>
+                    <a class="shell-nav-link @(string.Equals(currentPage, "/AdminDashboard/Index", StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-page="/AdminDashboard/Index">
+                        <span class="material-symbols-outlined shell-nav-icon @(string.Equals(currentPage, "/AdminDashboard/Index", StringComparison.OrdinalIgnoreCase) ? "icon-fill" : "")" aria-hidden="true">insert_chart</span>
                         <span>Dashboard Quản trị</span>
+                    </a>
+                    <a class="shell-nav-link @(IsActive("/AdminDashboard/TokenUsage") ? "active" : "")" asp-page="/AdminDashboard/TokenUsage">
+                        <span class="material-symbols-outlined shell-nav-icon @(IsActive("/AdminDashboard/TokenUsage") ? "icon-fill" : "")" aria-hidden="true">query_stats</span>
+                        <span>Thống kê token</span>
                     </a>
                     <a class="shell-nav-link @(IsActive("/AdminUsers") ? "active" : "")" asp-page="/AdminUsers/Index">
                         <span class="material-symbols-outlined shell-nav-icon @(IsActive("/AdminUsers") ? "icon-fill" : "")" aria-hidden="true">admin_panel_settings</span>

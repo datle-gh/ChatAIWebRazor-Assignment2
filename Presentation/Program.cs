@@ -88,6 +88,7 @@ builder.Services.AddScoped<INotificationRealtimeNotifier, SignalRNotificationRea
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+builder.Services.AddScoped<ITokenUsageReportService, TokenUsageReportService>();
 builder.Services.AddScoped<IRagasEvaluationService, RagasEvaluationService>();
 builder.Services.AddHttpClient<IRagasEvaluatorClient, RagasEvaluatorClient>();
 
